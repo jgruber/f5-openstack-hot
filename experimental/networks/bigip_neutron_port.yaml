@@ -1,6 +1,6 @@
 heat_template_version: 2016-04-08
 
-description: This template creates a standard neutron port to associate with a Big-IP instance. This template uses an index parameter that enables ports to be created as part of a resource group. 
+description: This template creates a standard neutron port to associate with a Big-IP instance. This template uses an index parameter that enables ports to be created as part of a resource group.
 
 parameters:
   index:
@@ -25,6 +25,7 @@ resources:
       admin_state_up: true
       allowed_address_pairs:
         - ip_address: 0.0.0.0/0
+        - ip_address: ::/0
       fixed_ips:
         - subnet: { get_param: [network_subnets, { get_param: index }] }
           ip_address: { get_param: [ip_addresses, { get_param: index }] }
