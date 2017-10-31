@@ -251,6 +251,8 @@ resources:
     type: OS::Neutron::Port
     properties:
       network: { get_param: mgmt_network }
+      allowed_address_pairs:
+        - ip_address: 0.0.0.0/0
       security_groups: [{ get_attr: [mgmt_security_group, mgmt_security_group_id] }]
   mgmt_security_group:
     type: F5::BigIP::ManagementSecurityGroup

@@ -279,6 +279,8 @@ resources:
       network: { get_param: network_vlan_name }
       security_groups: [{get_param: network_vlan_security_group_id}]
       admin_state_up: true
+      allowed_address_pairs:
+        - ip_address: 0.0.0.0/0
       fixed_ips:
         - subnet: { get_param: network_vlan_subnet }
           ip_address: { get_param: [bigip_cluster_self_ip_addresses,  {get_param: bigip_instance_num}] }

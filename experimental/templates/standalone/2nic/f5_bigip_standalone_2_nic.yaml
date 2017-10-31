@@ -224,6 +224,8 @@ resources:
     type: OS::Neutron::Port
     properties:
       network: { get_param: mgmt_network }
+      allowed_address_pairs:
+        - ip_address: 0.0.0.0/0
       security_groups: [{ get_attr: [mgmt_security_group, mgmt_security_group_id] }]
   mgmt_security_group:
     type: F5::BigIP::ManagementSecurityGroup
@@ -243,6 +245,8 @@ resources:
     type: OS::Neutron::Port
     properties:
       network: { get_param: network_vlan_name }
+      allowed_address_pairs:
+        - ip_address: 0.0.0.0/0
       security_groups: [{get_attr: [network_vlan_security_group, data_security_group_id]} ]
       admin_state_up: true
       fixed_ips:
