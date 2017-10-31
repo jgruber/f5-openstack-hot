@@ -1,3 +1,4 @@
+---
 heat_template_version: 2016-04-08
 
 description: This template downloads additional packages required to provision a Big-IP.
@@ -11,7 +12,7 @@ parameters:
   cloudlibs_url_override:
     type: string
     label: f5 cloud-libs URL Override
-    description: Alternate URL for f5-cloud-libs package. If not specified, the default GitHub location for f5-cloud-libs will be used. If version is different from default f5_cloudlibs_tag, ensure that hashes are valid by either updating scripts/verifyHash or by providing a f5_cloudlibs_verify_hash_url_override value. 
+    description: Alternate URL for f5-cloud-libs package. If not specified, the default GitHub location for f5-cloud-libs will be used. If version is different from default f5_cloudlibs_tag, ensure that hashes are valid by either updating scripts/verifyHash or by providing a f5_cloudlibs_verify_hash_url_override value.
     default: None
 resources:
   onboarding_libs:
@@ -21,8 +22,8 @@ resources:
       config:
         str_replace:
           params:
-            __cloudlibstag__: { get_param: cloudlibs_tag }
-            __cloudlibs_url_override__: { get_param: cloudlibs_url_override }
+            __cloudlibstag__: {get_param: cloudlibs_tag}
+            __cloudlibs_url_override__: {get_param: cloudlibs_url_override}
           template: |
             #!/bin/bash
             cloudlibsUrlOverride="__cloudlibs_url_override__"

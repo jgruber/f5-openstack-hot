@@ -1,6 +1,7 @@
+---
 heat_template_version: 2016-04-08
 
-description: This template builds components for dynamic number of nics. 
+description: This template builds components for dynamic number of nics.
 
 parameters:
   bigip_nic_count:
@@ -11,7 +12,7 @@ parameters:
     type: number
     label: f5 BIG-IP last NIC index (0-based)
     description: The 0-based index of the last NIC to attach to Big-IP. This is essentially bigip_nic_count minus 1. This helps identify the last nic in the resource group.
-                 Since there are no intrinsic arithmetic functions currently supported in heat, this parameter is required. 
+                 Since there are no intrinsic arithmetic functions currently supported in heat, this parameter is required.
   network_vlan_names:
     type: comma_delimited_list
     label: OS Neutron Network to map to the BIG-IP VLAN
@@ -34,7 +35,7 @@ parameters:
     label: f5 BIG-IP VE VLAN name
     description: Name of the VLAN to be created on the BIG-IP.
     default:
-     -
+      -
   bigip_vlan_mtus:
     type: comma_delimited_list
     label: f5 BIG-IP VE VLAN MTU
@@ -67,47 +68,47 @@ resources:
   security_groups:
     type: OS::Heat::ResourceGroup
     properties:
-      count: { get_param: bigip_nic_count }
+      count: {get_param: bigip_nic_count}
       resource_def:
         type: F5::BigIP::CustomSecurityGroup
         properties:
-          network_vlan_names: { get_param: network_vlan_names }
+          network_vlan_names: {get_param: network_vlan_names}
           security_group_index: "%index%"
-          security_group_rules: { get_param: [network_vlan_security_group_rules, security_group_rules] }
+          security_group_rules: {get_param: [network_vlan_security_group_rules, security_group_rules]}
 
   network_vlan_ports:
     type: OS::Heat::ResourceGroup
     properties:
-      count: { get_param: bigip_nic_count }
+      count: {get_param: bigip_nic_count}
       resource_def:
         type: F5::BigIP::NeutronPort
         properties:
           index: "%index%"
-          network_names: { get_param: network_vlan_names }
-          network_subnets: { get_param: network_vlan_subnets }
-          ip_addresses: { get_param: bigip_self_ip_addresses }
+          network_names: {get_param: network_vlan_names}
+          network_subnets: {get_param: network_vlan_subnets}
+          ip_addresses: {get_param: bigip_self_ip_addresses}
           security_groups: {get_attr: [security_groups, security_group_id]}
 
   onboard_network_configs:
     type: OS::Heat::ResourceGroup
     properties:
-      count: { get_param: bigip_nic_count }
+      count: {get_param: bigip_nic_count}
       resource_def:
         type: F5::BigIP::OnboardNetworkConfigIndexed
         properties:
-          #Note: %index% resolves directly for str_replace as shown here, but not in get_param
+          # Note: %index% resolves directly for str_replace as shown here, but not in get_param
           script_path: /config/onboard-network-%index%.sh
-          nic_count: { get_param: bigip_nic_count }
-          vlan_names: { get_param: bigip_vlan_names }
-          vlan_tags: { get_param: bigip_vlan_tags }
-          vlan_mtus: { get_param: bigip_vlan_mtus }
+          nic_count: {get_param: bigip_nic_count}
+          vlan_names: {get_param: bigip_vlan_names}
+          vlan_tags: {get_param: bigip_vlan_tags}
+          vlan_mtus: {get_param: bigip_vlan_mtus}
           vlan_nic_index: "%index%"
-          vlan_last_nic_index: { get_param: bigip_last_nic_index }
-          self_ip_addrs: { get_param: bigip_self_ip_addresses }
-          self_cidr_blocks:  { get_param: bigip_self_cidr_blocks}
-          self_port_lockdowns: { get_param: bigip_self_port_lockdowns }
-          default_gateway: { get_param: bigip_default_gateway }
-          wait_handle_curl: { get_param: wait_handle_curl}
+          vlan_last_nic_index: {get_param: bigip_last_nic_index}
+          self_ip_addrs: {get_param: bigip_self_ip_addresses}
+          self_cidr_blocks: {get_param: bigip_self_cidr_blocks}
+          self_port_lockdowns: {get_param: bigip_self_port_lockdowns}
+          default_gateway: {get_param: bigip_default_gateway}
+          wait_handle_curl: {get_param: wait_handle_curl}
 
   run_core_commands:
     type: OS::Heat::CloudConfig
@@ -117,24 +118,23 @@ resources:
         runcmd:
           - nohup /config/preOnboard.sh &>> /var/log/preOnboard.log < /dev/null &
           - nohup sh -c '/config/wait_cloudlibs_install.sh; /config/onboard.sh' >> /var/log/onboard.log < /dev/null &
-          - 
+          -
             str_replace:
               params:
-                <%last_nic_index%> : { get_param: bigip_last_nic_index }
+                <%last_nic_index%>: {get_param: bigip_last_nic_index}
               template: "nohup sh -c '/config/wait_cloudlibs_install.sh; f5-rest-node /config/cloud/openstack/node_modules/f5-cloud-libs/scripts/runScript.js --file /config/postOnboard.sh --wait-for ONBOARD_NETWORK_<%last_nic_index%>_DONE -o /var/log/postOnboard.log' &>> /var/log/runScript.log < /dev/null & "
 
   run_network_commands:
     type: F5::BigIP::RunOnboardNetworkConfigs
     properties:
-      nic_indexes:  { get_attr: [ onboard_network_configs, config_index ] }
+      nic_indexes: {get_attr: [onboard_network_configs, config_index]}
 
 outputs:
   port_ids:
-    value: { get_attr: [network_vlan_ports, bigip_neutron_port_id ]}
+    value: {get_attr: [network_vlan_ports, bigip_neutron_port_id]}
   init_4_onboard_network_configs:
-    value: { get_attr: [onboard_network_configs, config_id ]}
+    value: {get_attr: [onboard_network_configs, config_id]}
   init_5_run_core_commands:
-    value: { get_resource: run_core_commands }
+    value: {get_resource: run_core_commands}
   init_6_run_network_commands:
-    value: { get_resource: run_network_commands }
-
+    value: {get_resource: run_network_commands}

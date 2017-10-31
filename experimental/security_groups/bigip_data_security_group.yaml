@@ -1,3 +1,4 @@
+---
 heat_template_version: 2016-04-08
 
 description: This template deploys standard security group to be associated with a BIG-IP data VLAN.
@@ -13,8 +14,8 @@ resources:
     type: OS::Neutron::SecurityGroup
     properties:
       description: security group rules for data interfaces
-      name: { get_param: security_group_name }
-      rules: 
+      name: {get_param: security_group_name}
+      rules:
         - protocol: icmp
           direction: ingress
         - protocol: icmp
@@ -29,6 +30,6 @@ resources:
           direction: egress
 
 outputs:
-   data_security_group_id:
-     description: Get resource id of this security group
-     value: { get_resource: bigip_data_security_group }
+  data_security_group_id:
+    description: Get resource id of this security group
+    value: {get_resource: bigip_data_security_group}
