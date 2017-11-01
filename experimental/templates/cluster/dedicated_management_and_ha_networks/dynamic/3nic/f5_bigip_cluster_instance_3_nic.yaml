@@ -362,8 +362,6 @@ resources:
   init_4_2_onboard_network_config:
     type: F5::BigIP::OnboardNetworkConfig
     properties:
-      script_path: /config/onboard-network-2.sh
-      vlan_create_new: false
       vlan_name: {get_param: bigip_vlan_name}
       self_name: data_self_ip
       self_ip_addr: {get_attr: [network_vlan_port, fixed_ips, 0, ip_address]}
@@ -441,7 +439,7 @@ outputs:
   bigip_instance_ha_ip:
     description: HA Network SelfIP of the BIG-IP Instance
     value: {get_attr: [ha_vlan_port, fixed_ips, 0, ip_address]}
-  bigip_data_port:
+  bigip_instance_data_port:
     description: Data Network Port of the BIG-IP Instance
     value: {get_resource: network_vlan_port}
   bigip_instance_data_ip:
