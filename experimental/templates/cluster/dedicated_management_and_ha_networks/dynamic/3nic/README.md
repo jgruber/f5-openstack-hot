@@ -59,7 +59,7 @@ We encourage you to use our [Slack channel](https://f5cloudsolutions.herokuapp.c
 
 #### CLI Example
 ```
-openstack stack create stack-3nic-cluster -t src/f5-openstack-hot/experimental/templates/cluster/3nic/f5_bigip_cluster_3_nic.yaml -e src/f5-openstack-hot/experimental/templates/cluster/3nic/f5_bigip_cluster_3_nic_env.yaml
+openstack stack create stack-3nic-cluster -t src/f5-openstack-hot/experimental/templates/cluster/dedicated_management_and_ha_networks/dynamic/3nic/f5_bigip_cluster_3_nic.yaml -e src/f5-openstack-hot/experimental/templates/cluster/dedicated_management_and_ha_networks/dynamic/3nic/f5_bigip_cluster_3_nic_env.yaml
 ```
 
 ### Parameters
@@ -98,12 +98,12 @@ The following parameters can be defined in your environment file.
 
 | Parameter | Required | Description | Constraints |
 | --- | :---: | --- | --- |
-| external_network | Yes | Name of the external network where the floating IP resides. | Network must exist |
 | mgmt_network | Yes | Network to which the BIG-IP management interface is attached. | Network must exist |
+| mgmt_subnet | Yes | Subnet to which the BIG-IP management interface is attached. | Subnet must exist |
 | mgmt_security_group_name | Yes | Name to apply on the security group for the BIG-IP management network. |  |
-| ha_vlan_security_group_name | Yes | Name to apply on the security group for BIG-IP VLAN. |  |
-| ha_vlan_name | Yes | OS Neutron Network to map to the BIG-IP VLAN | Network must exist |
-| ha_vlan_subnet | Yes | The Neutron Subnet for the corresponding BIG-IP VLAN.  | Subnet must exist |
+| ha_network | Yes | Network to which the BIG-IP cluster sync is attached. | Network must exist |
+| ha_subnet | Yes | Subnet to which the BIG-IP cluster sync is attached. | Subnet must exist |
+| ha_security_group_name | Yes | Name to apply on the security group for BIG-IP VLAN. |  |
 | network_vlan_security_group_name | Yes | Name to apply on the security group for BIG-IP VLAN. |  |
 | network_vlan_name | Yes | OS Neutron Network to map to the BIG-IP VLAN | Network must exist |
 | network_vlan_subnet | Yes | The Neutron Subnet for the corresponding BIG-IP VLAN.  | Subnet must exist |
@@ -114,12 +114,14 @@ The following parameters can be defined in your environment file.
 | --- | :---: | --- | --- |
 | bigip_default_gateway | No | Optional upstream Gateway IP Address for the BIG-IP instance.  |  |
 | bigip_mgmt_port | No | The default is 443 |  |
+| bigip_ha_vlan_name | No | Name of the HA VLAN to be created on the BIG-IP. The default is **data**. |  |
+| bigip_ha_vlan_mtu | No | MTU value of the HA VLAN on the BIG-IP. The default is **1400**. |  |
+| bigip_ha_vlan_tag | No | Tag to apply on the HA VLAN on the BIG-IP. Use the default value **None** for untagged. |  |
+| bigip_ha_vlan_nic | No | The NIC associated with the BIG-IP HA VLAN. For 3-NIC this defaults to **1.1** |  |
 | bigip_vlan_name | No | Name of the VLAN to be created on the BIG-IP. The default is **data**. |  |
 | bigip_vlan_mtu | No | MTU value of the VLAN on the BIG-IP. The default is **1400**. |  |
 | bigip_vlan_tag | No | Tag to apply on the VLAN on the BIG-IP. Use the default value **None** for untagged. |  |
-| bigip_vlan_nic | No | The NIC associated with the BIG-IP VLAN. For 2-NIC this defaults to **1.1** |  |
-| bigip_self_ip_addresses | Yes | List of self IP addresses to associate with the BIG-IP VLAN.  | A static value must be supplied. |
-| bigip_self_cidr_block | Yes | CIDR Block for the BIG-IP self IP address. |  |
+| bigip_vlan_nic | No | The NIC associated with the BIG-IP VLAN. For 3-NIC this defaults to **1.2** |  |
 | bigip_self_port_lockdown | No | Optional list of service:port lockdown settings for the VLAN. If no value is supplied, the default is used.  |  Syntax: List of `service:port` example: `[tcp:443, tcp:22]` |
 
 
@@ -130,7 +132,6 @@ The following parameters can be defined in your environment file.
 | bigip_device_group | No | Name of the BIG-IP Device Group to create or join. The default is **Sync**  |  |
 | bigip_auto_sync | No | Toggles flag for enabling BIG-IP Cluster Auto Sync. The default is **true**.  |  |
 | bigip_save_on_auto_sync | No | Toggles flag for enabling saving on config-sync auto-sync . The default is **true**.  |  |
-| bigip_cluster_self_ip_addresses | Yes | List of BIG-IP self IP addresses to use for clustering |  |
 
 <br>
 

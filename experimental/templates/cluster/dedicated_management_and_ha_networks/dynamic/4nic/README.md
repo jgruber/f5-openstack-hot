@@ -1,4 +1,4 @@
-# Deploying the BIG-IP in OpenStack - Clustered 4 NIC
+# Deploying the BIG-IP in OpenStack - Clustered 3 NIC
 
 [![Slack Status](https://f5cloudsolutions.herokuapp.com/badge.svg)](https://f5cloudsolutions.herokuapp.com)
 [![Releases](https://img.shields.io/github/release/f5networks/f5-openstack-hot.svg)](https://github.com/f5networks/f5-openstack-hot/releases)
@@ -8,7 +8,7 @@
 
 This solution uses a Heat Orchestration Template to launch and configure two BIG-IP 4-NIC VEs in a clustered, highly available configuration in an Openstack Private Cloud.  When you deploy your applications behind a HA pair of F5 BIG-IP VEs, the BIG-IP VE instances are all in Active-Standby, and are used as a single device for failover. If one device becomes unavailable, the standby takes over traffic management duties, ensuring you have the highest level of availability for your applications. You can also configure the BIG-IP VE to enable F5's L4/L7 security features, access control, and intelligent traffic management.
 
-In a dedicated 4-NIC implementation, each BIG-IP VE has one interface used for management, the second interface is used for cluster communications, and the third and fourth interfaces are connected into the Neutron networks where traffic is processed by the pool members in a traditional two-ARM design. Traffic flows from the BIG-IP VE to the application servers.
+In a dedicated 4-NIC implementation, each BIG-IP VE has one interface used for management, the second interface is used for cluster communications, and the third interface connected into the Neutron networks where traffic is processed by the pool members in a traditional one-ARM design. Traffic flows from the BIG-IP VE to the application servers.
 
 The **cluster** heat orchestration template incorporates existing networks defined in Neutron.
 
@@ -59,7 +59,7 @@ We encourage you to use our [Slack channel](https://f5cloudsolutions.herokuapp.c
 
 #### CLI Example
 ```
-openstack stack create stack-4nic-cluster -t src/f5-openstack-hot/experimental/templates/cluster/3nic/f5_bigip_cluster_4_nic.yaml -e src/f5-openstack-hot/experimental/templates/cluster/3nic/f5_bigip_cluster_4_nic_env.yaml
+openstack stack create stack-4nic-cluster -t src/f5-openstack-hot/experimental/templates/cluster/dedicated_management_and_ha_networks/dynamic/4nic/f5_bigip_cluster_4_nic.yaml -e src/f5-openstack-hot/experimental/templates/cluster/dedicated_management_and_ha_networks/dynamic/4nic/f5_bigip_cluster_4_nic_env.yaml
 ```
 
 ### Parameters
@@ -98,15 +98,19 @@ The following parameters can be defined in your environment file.
 
 | Parameter | Required | Description | Constraints |
 | --- | :---: | --- | --- |
-| external_network | Yes | Name of the external network where the floating IP resides. | Network must exist |
 | mgmt_network | Yes | Network to which the BIG-IP management interface is attached. | Network must exist |
+| mgmt_subnet | Yes | Subnet to which the BIG-IP management interface is attached. | Subnet must exist |
 | mgmt_security_group_name | Yes | Name to apply on the security group for the BIG-IP management network. |  |
-| ha_vlan_security_group_name | Yes | Name to apply on the security group for BIG-IP VLAN. |  |
-| ha_vlan_name | Yes | OS Neutron Network to map to the BIG-IP VLAN | Network must exist |
-| ha_vlan_subnet | Yes | The Neutron Subnet for the corresponding BIG-IP VLAN.  | Subnet must exist |
+| ha_network | Yes | Network to which the BIG-IP cluster sync is attached. | Network must exist |
+| ha_subnet | Yes | Subnet to which the BIG-IP cluster sync is attached. | Subnet must exist |
+| ha_security_group_name | Yes | Name to apply on the security group for BIG-IP VLAN. |  |
 | network_vlan_security_group_name | Yes | Name to apply on the security group for BIG-IP VLAN. |  |
 | network_vlan_name | Yes | OS Neutron Network to map to the BIG-IP VLAN | Network must exist |
 | network_vlan_subnet | Yes | The Neutron Subnet for the corresponding BIG-IP VLAN.  | Subnet must exist |
+| network_vlan_2_security_group_name | Yes | Name to apply on the security group for BIG-IP VLAN. |  |
+| network_vlan_2_name | Yes | OS Neutron Network to map to the BIG-IP VLAN | Network must exist |
+| network_vlan_2_subnet | Yes | The Neutron Subnet for the corresponding BIG-IP VLAN.  | Subnet must exist |
+
 
 #### BIG-IP Network
 
@@ -114,12 +118,18 @@ The following parameters can be defined in your environment file.
 | --- | :---: | --- | --- |
 | bigip_default_gateway | No | Optional upstream Gateway IP Address for the BIG-IP instance.  |  |
 | bigip_mgmt_port | No | The default is 443 |  |
+| bigip_ha_vlan_name | No | Name of the HA VLAN to be created on the BIG-IP. The default is **data**. |  |
+| bigip_ha_vlan_mtu | No | MTU value of the HA VLAN on the BIG-IP. The default is **1400**. |  |
+| bigip_ha_vlan_tag | No | Tag to apply on the HA VLAN on the BIG-IP. Use the default value **None** for untagged. |  |
+| bigip_ha_vlan_nic | No | The NIC associated with the BIG-IP HA VLAN. For 4-NIC this defaults to **1.1** |  |
 | bigip_vlan_name | No | Name of the VLAN to be created on the BIG-IP. The default is **data**. |  |
 | bigip_vlan_mtu | No | MTU value of the VLAN on the BIG-IP. The default is **1400**. |  |
 | bigip_vlan_tag | No | Tag to apply on the VLAN on the BIG-IP. Use the default value **None** for untagged. |  |
-| bigip_vlan_nic | No | The NIC associated with the BIG-IP VLAN. For 2-NIC this defaults to **1.1** |  |
-| bigip_self_ip_addresses | Yes | List of self IP addresses to associate with the BIG-IP VLAN.  | A static value must be supplied. |
-| bigip_self_cidr_block | Yes | CIDR Block for the BIG-IP self IP address. |  |
+| bigip_vlan_nic | No | The NIC associated with the BIG-IP VLAN. For 4-NIC this defaults to **1.2** |  |
+| bigip_vlan_2_name | No | Name of the VLAN to be created on the BIG-IP. The default is **data**. |  |
+| bigip_vlan_2_mtu | No | MTU value of the VLAN on the BIG-IP. The default is **1400**. |  |
+| bigip_vlan_2_tag | No | Tag to apply on the VLAN on the BIG-IP. Use the default value **None** for untagged. |  |
+| bigip_vlan_2_nic | No | The NIC associated with the BIG-IP VLAN. For 4-NIC this defaults to **1.3** |  |
 | bigip_self_port_lockdown | No | Optional list of service:port lockdown settings for the VLAN. If no value is supplied, the default is used.  |  Syntax: List of `service:port` example: `[tcp:443, tcp:22]` |
 
 
@@ -130,7 +140,6 @@ The following parameters can be defined in your environment file.
 | bigip_device_group | No | Name of the BIG-IP Device Group to create or join. The default is **Sync**  |  |
 | bigip_auto_sync | No | Toggles flag for enabling BIG-IP Cluster Auto Sync. The default is **true**.  |  |
 | bigip_save_on_auto_sync | No | Toggles flag for enabling saving on config-sync auto-sync . The default is **true**.  |  |
-| bigip_cluster_self_ip_addresses | Yes | List of BIG-IP self IP addresses to use for clustering |  |
 
 <br>
 
