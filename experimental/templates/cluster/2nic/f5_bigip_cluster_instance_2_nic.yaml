@@ -409,3 +409,6 @@ outputs:
   bigip_instance_floating_ip:
     description: Management Floating IP of the BIG-IP Instance
     value: {get_attr: [floating_ip, floating_ip_address]}
+  bigip_data_port:
+    description: Data Network Port of the BIG-IP Instance
+    value: {get_resource: network_vlan_port}

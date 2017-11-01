@@ -314,3 +314,7 @@ outputs:
     value: {get_attr: [device_cluster, resource.1.bigip_instance_name]}
   bigip_standby_floating_ip:
     value: {get_attr: [device_cluster, resource.1.bigip_instance_floating_ip]}
+  bigip_active_data_port:
+    value: {get_attr: [device_cluster, resource.0.bigip_data_port]}
+  bigip_standby_data_port:
+    value: {get_attr: [device_cluster, resource.1.bigip_data_port]}
