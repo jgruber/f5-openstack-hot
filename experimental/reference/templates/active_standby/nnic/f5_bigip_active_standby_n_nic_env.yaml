@@ -1,0 +1,152 @@
+---
+parameters:
+  bigip_image: BIGIP-13.0.0.2.0.1671.LTM_1SLOT
+  bigip_flavor: m1.bigip.1SLOT
+  bigip_cluster_name: sync-failover
+  bigip_cluster_sync_type: sync-failover
+  bigip_cluster_auto_sync: false
+  bigip_cluster_save_on_auto_sync: false
+  use_config_drive: true
+  bigip_os_ssh_key: admin_mydemo_rocks
+  bigip_admin_pwd: openstack
+  bigip_root_pwd: openstack
+  bigip_modules:
+    - ltm:nominal
+
+  # This should be an existing neutron network.
+  external_network: public
+
+  # This should be an existing neutron network.
+  mgmt_network: management
+
+  # Name to apply to the security group to be created for management network.
+  mgmt_security_group_name: mgmt-secgroup-nnic
+
+
+  # This should be the number of additional nics, excluding mgmt (nic 1.0).
+  bigip_nic_count: 4
+
+  # This is usually bigip_nic_count minus 1. (zero-based index)
+  # This determines which nic setup to wait to finish before triggering post_onboard.sh, where custom tmsh commands can be added.
+  bigip_last_nic_index: 3
+
+  # This should be a list of existing neutron networks.
+  network_vlan_names:
+    - HA
+    - app_tier_1
+    - app_tier_2
+    - dmz1
+
+  # This should be a list of existing neutron subnets.
+  network_vlan_subnets:
+    - HA
+    - app_tier_1
+    - app_tier_2
+    - dmz1
+
+  # Rules to apply to the security groups to be created for the vlans.
+  # Each group of rules is the same syntax as rules property of OS::Neutron::SecurityGroup
+  # JSON object { "security_group_rules": [ {"rules": [...] }, { "rules": [...] } ] }
+  network_vlan_security_group_rules:
+    security_group_rules:
+      # secgroup-1
+      - rules:
+          - protocol: icmp
+            direction: ingress
+          - protocol: icmp
+            direction: egress
+          - protocol: tcp
+            direction: ingress
+          - protocol: tcp
+            direction: egress
+          - protocol: udp
+            direction: ingress
+          - protocol: udp
+            direction: egress
+      # secgroup-1
+      - rules:
+          - protocol: icmp
+            direction: ingress
+          - protocol: icmp
+            direction: egress
+          - protocol: tcp
+            direction: ingress
+          - protocol: tcp
+            direction: egress
+          - protocol: udp
+            direction: ingress
+          - protocol: udp
+            direction: egress
+      # secgroup-2
+      - rules:
+          - protocol: icmp
+            direction: ingress
+          - protocol: icmp
+            direction: egress
+          - protocol: tcp
+            direction: ingress
+          - protocol: tcp
+            direction: egress
+          - protocol: udp
+            direction: ingress
+          - protocol: udp
+            direction: egress
+      # secgroup-3
+      - rules:
+          - protocol: icmp
+            direction: ingress
+          - protocol: icmp
+            direction: egress
+          - protocol: tcp
+            direction: ingress
+          - protocol: tcp
+            direction: egress
+          - protocol: udp
+            direction: ingress
+          - protocol: udp
+            direction: egress
+
+  bigip_vlan_mtus:
+    - 1400
+    - 1400
+    - 1400
+    - 1400
+
+  bigip_vlan_tags:
+    - None
+    - None
+    - None
+    - None
+
+  bigip_vlan_names:
+    - HA
+    - app_tier_1
+    - app_tier_2
+    - dmz1
+
+  bigip_self_port_lockdowns:
+    # Nested list items are returned in the format [u'item'], which causes extra chars to be returned when using str_split.
+    # So we are using flat list instead with semicolon as delimiter.
+    # Syntax for each list item: <service>:<port>
+    # If left empty, use the default allow settings for the vlan - same as allow-default.
+    # To be supported in future cloud-libs fix: allow-none, allow-all
+    - allow-default
+    - allow-all
+    - allow-all
+    - tcp:22;tcp:443
+
+    # Tag value for f5-cloud-libs download. Syntax: <vrelease> Defaults to v3.3.0
+    # f5_cloudlibs_tag: v3.3.2
+    # f5_cloudlibs_verify_hash_url_override: https://raw.githubusercontent.com/F5Networks/f5-cloud-libs/v3.3.2/dist/verifyHash
+
+resource_registry:
+  F5::BigIP::OverrideDefaultConfig: ../../../configs/override_default_config.yaml
+  F5::BigIP::OnboardingLibs: ../../../configs/onboarding_libs.yaml
+  F5::BigIP::OnboardingScripts: ../../../configs/onboarding_scripts.yaml
+  F5::BigIP::OnboardNetworkConfigIndexed: ../../../configs/onboarding_network_config_indexed.yaml
+  F5::BigIP::OnboardClusterConfig: ../../../configs/onboarding_cluster_config.yaml
+  F5::BigIP::ManagementSecurityGroup: ../../../security_groups/bigip_mgmt_security_group.yaml
+  F5::BigIP::CustomSecurityGroup: ../../../security_groups/bigip_custom_security_group.yaml
+  F5::BigIP::NeutronPort: ../../../networks/bigip_neutron_port.yaml
+  F5::BigIP::NNicHandler: ../../../networks/bigip_nnic_handler.yaml
+  F5::BigIP::RunOnboardNetworkConfigs: ../../../configs/run_onboard_network_configs.yaml
