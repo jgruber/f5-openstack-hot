@@ -148,5 +148,7 @@ resource_registry:
   F5::BigIP::ManagementSecurityGroup: ../../../security_groups/bigip_mgmt_security_group.yaml
   F5::BigIP::CustomSecurityGroup: ../../../security_groups/bigip_custom_security_group.yaml
   F5::BigIP::NeutronPort: ../../../networks/bigip_neutron_port.yaml
+  F5::BigIP::NeutronPortSingleFixedIP: ../../../networks/bigip_neutron_port_single_fixed_ip.yaml
   F5::BigIP::NNicHandler: ../../../networks/bigip_nnic_handler.yaml
+  F5::BigIP::NNicHandlerSingleFixedIP: ../../../networks/bigip_nnic_handler_single_fixed_ip.yaml
   F5::BigIP::RunOnboardNetworkConfigs: ../../../configs/run_onboard_network_configs.yaml

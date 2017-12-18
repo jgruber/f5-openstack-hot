@@ -73,7 +73,7 @@ resources:
     properties:
       count: {get_param: bigip_nic_count}
       resource_def:
-        type: F5::BigIP::NeutronPort
+        type: F5::BigIP::NeutronPortSingleFixedIP
         properties:
           index: "%index%"
           network_names: {get_param: network_vlan_names}

@@ -30,6 +30,24 @@ parameters:
     default: m1.medium
     constraints:
       - custom_constraint: nova.flavor
+  bigip_cluster_name:
+    type: string
+    label: f5 BIG-IP VE Device Group Name
+  bigip_cluster_sync_type:
+    type: string
+    label: f5 BIG-IP VE Cluster Sync Type
+    description: Is this a sync-failover or sync-only device group
+    default: sync-failover
+  bigip_cluster_auto_sync:
+    type: boolean
+    label: f5 BIG-IP VE Cluster AutoSync
+    description: Should a clustered device auto synchronize config changes
+    default: false
+  bigip_cluster_save_on_auto_sync:
+    type: boolean
+    label: f5 BIG-IP VE Cluster Config Save on Auto Sync
+    description: Should a clustered device save its configuration on automatic synchronization
+    default: false
   use_config_drive:
     type: boolean
     label: Use Config Drive
@@ -179,18 +197,42 @@ parameters:
     description: Optional list with each item a list of <service:port> lockdown settings for the VLAN. If no value is supplied, default is used. Each list item corresponds to the settings for each NIC at that index.
     default:
       -
+  f5_bigiq_host:
+    type: string
+    label: BigIQ Host
+    description: BigIQ license activation host.
+    default: 192.168.245.1
+  f5_bigiq_username:
+    type: string
+    label: BigIQ Username
+    description: BigIQ license user.
+    default: admin
+  f5_bigiq_password:
+    type: string
+    label: BigIQ Password
+    description: BigIQ license user.
+    default: admin
+    hidden: true
+  f5_bigiq_license_pool_name:
+    type: string
+    label: BigIQ License Pool Name
+    description: BigIQ license pool to use for this VE
 
 parameter_groups:
   - label: BIG-IP General Provisioning
     parameters:
       - bigip_image
       - bigip_flavor
+      - bigip_cluster_name
+      - bigip_cluster_sync_type
+      - bigip_cluster_auto_sync
+      - bigip_cluster_save_on_auto_sync
       - use_config_drive
       - f5_cloudlibs_tag
       - f5_cloudlibs_url_override
       - f5_cloudlibs_verify_hash_url_override
       - bigip_servers_ntp
-      - bigip_servers_dns
+      - bigip_servers_dns      
   - label: BIG-IP nNIC Provisioning
     parameters:
       - bigip_nic_count
@@ -221,152 +263,127 @@ parameter_groups:
       - bigip_vlan_mtus
       - bigip_vlan_tags
       - bigip_self_port_lockdowns
+  - label: Licensing
+    parameters:
+      - f5_bigiq_host
+      - f5_bigiq_username
+      - f5_bigiq_password
+      - f5_bigiq_license_pool_name
 
 resources:
-  wait_condition_onboard_complete:
-    type: OS::Heat::WaitCondition
+  
+  active_standby_cluster:
+    type: F5::BigIP::ActiveStandbyPair
     properties:
-      handle: {get_resource: wait_handle_onboard}
-      count: 3
-      timeout: 1800
-  wait_handle_onboard:
-    type: OS::Heat::WaitConditionHandle
-  wait_condition_onboard_network_complete:
-    type: OS::Heat::WaitCondition
-    properties:
-      handle: {get_resource: wait_handle_onboard_network}
-      count: {get_param: bigip_nic_count}
-      timeout: 1800
-  wait_handle_onboard_network:
-    type: OS::Heat::WaitConditionHandle
-  mgmt_port:
-    type: OS::Neutron::Port
-    properties:
-      network: {get_param: mgmt_network}
-      allowed_address_pairs:
-        - ip_address: 0.0.0.0/0
-        - ip_address: ::/0
-      security_groups: [{get_attr: [mgmt_security_group, mgmt_security_group_id]}]
-  mgmt_security_group:
-    type: F5::BigIP::ManagementSecurityGroup
-    properties:
-      security_group_name: {get_param: mgmt_security_group_name}
-      management_port: {get_param: bigip_mgmt_port}
-  floating_ip:
-    type: OS::Neutron::FloatingIP
-    properties:
-      floating_network: {get_param: external_network}
-      port_id: {get_resource: mgmt_port}
-  bigip_nnic_handler:
-    type: F5::BigIP::NNicHandler
-    properties:
+      bigip_image: {get_param: bigip_image}
+      bigip_flavor: {get_param: bigip_flavor}
+      bigip_cluster_name: {get_param: bigip_cluster_name}
+      bigip_cluster_sync_type: {get_param: bigip_cluster_sync_type}
+      bigip_cluster_auto_sync: {get_param: bigip_cluster_auto_sync}
+      bigip_cluster_save_on_auto_sync: {get_param: bigip_cluster_save_on_auto_sync}
+      use_config_drive: {get_param: use_config_drive}
+      f5_cloudlibs_tag: {get_param: f5_cloudlibs_tag}
+      f5_cloudlibs_url_override: {get_param: f5_cloudlibs_url_override}
+      f5_cloudlibs_verify_hash_url_override: {get_param: f5_cloudlibs_verify_hash_url_override}
+      bigip_servers_ntp: {get_param: bigip_servers_ntp}
+      bigip_servers_dns: {get_param: bigip_servers_dns}
       bigip_nic_count: {get_param: bigip_nic_count}
       bigip_last_nic_index: {get_param: bigip_last_nic_index}
+      bigip_os_ssh_key: {get_param: bigip_os_ssh_key}
+      bigip_admin_pwd: {get_param: bigip_admin_pwd}
+      bigip_root_pwd: {get_param: bigip_root_pwd}
+      bigip_license_key: {get_param: bigip_license_key}
+      bigip_addon_license_keys: {get_param: bigip_addon_license_keys}
+      bigip_modules: {get_param: bigip_modules}
+      external_network: {get_param: external_network}
+      mgmt_network: {get_param: mgmt_network}
+      mgmt_security_group_name: {get_param: mgmt_security_group_name}
+      network_vlan_security_group_rules: {get_param: network_vlan_security_group_rules}
       network_vlan_names: {get_param: network_vlan_names}
       network_vlan_subnets: {get_param: network_vlan_subnets}
-      network_vlan_security_group_rules: {get_param: network_vlan_security_group_rules}
-      bigip_vlan_names: {get_param: bigip_vlan_names}
-      bigip_vlan_tags: {get_param: bigip_vlan_tags}
-      bigip_vlan_mtus: {get_param: bigip_vlan_mtus}
-      bigip_self_port_lockdowns: {get_param: bigip_self_port_lockdowns}
       bigip_default_gateway: {get_param: bigip_default_gateway}
-      wait_handle_curl: {get_attr: [wait_handle_onboard_network, curl_cli]}
-  init_1_override_default_config:
-    type: F5::BigIP::OverrideDefaultConfig
+      bigip_mgmt_port: {get_param: bigip_mgmt_port}
+      bigip_vlan_names: {get_param: bigip_vlan_names}
+      bigip_vlan_mtus: {get_param: bigip_vlan_mtus}
+      bigip_vlan_tags: {get_param: bigip_vlan_tags}
+      bigip_self_port_lockdowns: {get_param: bigip_self_port_lockdowns}
+
+  bigip_master_licensor:
+    type: F5::BigIQ::LicensePoolUnmanagedMember
+    depends_on: [active_standby_cluster]
     properties:
-      admin_password: {get_param: bigip_admin_pwd}
-      root_password: {get_param: bigip_root_pwd}
-  init_2_onboard_libs:
-    type: F5::BigIP::OnboardingLibs
+      bigiq_host: {get_param: f5_bigiq_host}
+      bigiq_username: {get_param: f5_bigiq_username}
+      bigiq_password: {get_param: f5_bigiq_password}
+      bigiq_license_pool_name: {get_param: f5_bigiq_license_pool_name}
+      bigip_management_ip: {get_attr: [active_standby_cluster, floating_ip_master]}
+      bigip_username: admin
+      bigip_password: {get_param: bigip_admin_pwd}
+
+  bigip_slave_licensor:
+    type: F5::BigIQ::LicensePoolUnmanagedMember
+    depends_on: [active_standby_cluster]
     properties:
-      cloudlibs_tag: {get_param: f5_cloudlibs_tag}
-      cloudlibs_url_override: {get_param: f5_cloudlibs_url_override}
-  init_3_onboard_scripts:
-    type: F5::BigIP::OnboardingScripts
-    properties:
-      verify_hash_url_override: {get_param: f5_cloudlibs_verify_hash_url_override}
-      bigip_addon_licenses: {get_param: bigip_addon_license_keys}
-      bigip_license: {get_param: bigip_license_key}
-      modules: {get_param: bigip_modules}
-      ntp: {get_param: bigip_servers_ntp}
-      dns: {get_param: bigip_servers_dns}
-      host_name: {get_attr: [mgmt_port, show, dns_assignment, 0, fqdn]}
-      management_ip: {get_attr: [mgmt_port, fixed_ips, 0, ip_address]}
-      management_port: {get_param: bigip_mgmt_port}
-      ssh_key_name: {get_param: bigip_os_ssh_key}
-      use_config_drive: {get_param: use_config_drive}
-      wait_handle_curl: {get_attr: [wait_handle_onboard, curl_cli]}
-  bigip_provision:
-    type: OS::Heat::MultipartMime
-    properties:
-      parts:
-        repeat:
-          template:
-            config: <%config%>
-          for_each:
-            <%config%>:
-              str_split:
-                - ','
-                -
-                  list_join:
-                    - ','
-                    - [{get_resource: init_1_override_default_config}]
-                    - [{get_resource: init_2_onboard_libs}]
-                    - [{get_resource: init_3_onboard_scripts}]
-                    - {get_attr: [bigip_nnic_handler, init_4_onboard_network_configs]}
-                    - [{get_attr: [bigip_nnic_handler, init_5_run_core_commands]}]
-                    - [{get_attr: [bigip_nnic_handler, init_6_run_network_commands]}]
-  bigip_instance:
-    type: OS::Nova::Server
-    depends_on: bigip_nnic_handler
-    properties:
-      image: {get_param: bigip_image}
-      flavor: {get_param: bigip_flavor}
-      key_name: {get_param: bigip_os_ssh_key}
-      admin_user: root
-      config_drive: {get_param: use_config_drive}
-      networks:
-        repeat:
-          template:
-            port: <%port%>
-          for_each:
-            <%port%>:
-              str_split:
-                - ','
-                -
-                  list_join:
-                    - ','
-                    - [{get_resource: mgmt_port}]
-                    - {get_attr: [bigip_nnic_handler, port_ids]}
-      user_data_format: RAW
-      user_data: {get_resource: bigip_provision}
+      bigiq_host: {get_param: f5_bigiq_host}
+      bigiq_username: {get_param: f5_bigiq_username}
+      bigiq_password: {get_param: f5_bigiq_password}
+      bigiq_license_pool_name: {get_param: f5_bigiq_license_pool_name}
+      bigip_management_ip: {get_attr: [active_standby_cluster, floating_ip_slave]}
+      bigip_username: admin
+      bigip_password: {get_param: bigip_admin_pwd}
 
 outputs:
-  bigip_instance_id:
+  bigip_instance_id_master:
     description: ID of the BIG-IP instance
-    value: {get_resource: bigip_instance}
-  bigip_instance_name:
+    value: {get_attr: [active_standby_cluster, bigip_instance_id_master]}
+  bigip_instance_name_master:
     description: Name of the BIG-IP instance
-    value: {get_attr: [bigip_instance, name]}
-  floating_ip:
+    value: {get_attr: [active_standby_cluster, bigip_instance_name_master]}
+  floating_ip_master:
     description: The Floating IP address of the BIG-IP instance
-    value: {get_attr: [floating_ip, floating_ip_address]}
-  mgmt_ip:
+    value: {get_attr: [active_standby_cluster, floating_ip_master]}
+  mgmt_ip_master:
     description: The mgmt IP address of BIG-IP instance
-    value: {get_attr: [mgmt_port, fixed_ips, 0, ip_address]}
-  mgmt_mac:
+    value: {get_attr: [active_standby_cluster, mgmt_ip_master]}
+  mgmt_mac_master:
     description: The mgmt MAC address of BIG-IP instance
-    value: {get_attr: [mgmt_port, mac_address]}
-  mgmt_port_id:
+    value: {get_attr: [active_standby_cluster, mgmt_mac_master]}
+  mgmt_port_id_master:
     description: The port id of the BIG-IP mgmt interface
-    value: {get_resource: mgmt_port}
-  data_port_ids:
+    value: {get_attr: [active_standby_cluster, mgmt_port_id_master]}
+  data_port_ids_master:
     description: The port ids of the TMM interfaces
-    value: {get_attr: [bigip_nnic_handler, port_ids]}
-  data_fixed_ips:
+    value: {get_attr: [active_standby_cluster, data_port_ids_master]}
+  data_fixed_ips_master:
     description: The fixed_ips for the port of the TMM interfaces
-    value: {get_attr: [bigip_nnic_handler, port_fixed_ips]}
-  data_fixed_subnets:
+    value: {get_attr: [active_standby_cluster, data_fixed_ips_master]}
+  data_fixed_subnets_master:
     description: The port ids of the TMM interfaces
-    value: {get_attr: [bigip_nnic_handler, port_subnets]}
-  
+    value: {get_attr: [active_standby_cluster, data_fixed_subnets_master]}
+  bigip_instance_id_slave:
+    description: ID of the BIG-IP instance
+    value: {get_attr: [active_standby_cluster, bigip_instance_id_slave]}
+  bigip_instance_name_slave:
+    description: Name of the BIG-IP instance
+    value: {get_attr: [active_standby_cluster, bigip_instance_name_slave]}
+  floating_ip_slave:
+    description: The Floating IP address of the BIG-IP instance
+    value: {get_attr: [active_standby_cluster, floating_ip_slave]}
+  mgmt_ip_slave:
+    description: The mgmt IP address of BIG-IP instance
+    value: {get_attr: [active_standby_cluster, mgmt_ip_slave]}
+  mgmt_mac_slave:
+    description: The mgmt MAC address of BIG-IP instance
+    value: {get_attr: [active_standby_cluster, mgmt_mac_slave]}
+  mgmt_port_id_slave:
+    description: The port id of the BIG-IP mgmt interface
+    value: {get_attr: [active_standby_cluster, mgmt_port_id_slave]}
+  data_port_ids_slave:
+    description: The port ids of the TMM interfaces
+    value: {get_attr: [active_standby_cluster, data_port_ids_slave]}
+  data_fixed_ips_slave:
+    description: The fixed_ips for the port of the TMM interfaces
+    value: {get_attr: [active_standby_cluster, data_fixed_ips_slave]}
+  data_fixed_subnets_slave:
+    description: The port ids of the TMM interfaces
+    value: {get_attr: [active_standby_cluster, data_fixed_subnets_slave]}

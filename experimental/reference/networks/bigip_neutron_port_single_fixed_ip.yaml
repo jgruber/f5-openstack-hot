@@ -26,14 +26,8 @@ resources:
         - ip_address: 0.0.0.0/0
         - ip_address: ::/0
       fixed_ips:
-        repeat:
-          for_each:
-            <%subnet%>: 
-              str_split:
-               - ';'
-               - {get_param: [network_subnets, {get_param: index}]}
-          template:
-            subnet: <%subnet%>
+        - subnet: 
+            str_split: [';', {get_param: [network_subnets, {get_param: index}]}, 0]
 
 outputs:
   neutron_port_id:

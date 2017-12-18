@@ -325,7 +325,7 @@ resources:
       floating_network: {get_param: external_network}
       port_id: {get_resource: mgmt_port_slave}  
   bigip_nnic_handler_master:
-    type: F5::BigIP::NNicHandler
+    type: F5::BigIP::NNicHandlerSingleFixedIP
     properties:
       bigip_nic_count: {get_param: bigip_nic_count}
       bigip_last_nic_index: {get_param: bigip_last_nic_index}
@@ -403,7 +403,7 @@ resources:
       auto_sync: {get_param: bigip_cluster_auto_sync}
       save_on_auto_sync: {get_param: bigip_cluster_save_on_auto_sync}
       host_name: {get_attr: [mgmt_port_master, show, dns_assignment, 0, fqdn]}
-      config_sync_ip: {get_attr: [bigip_nnic_handler_master, port_ips, 0]}
+      config_sync_ip: {get_attr: [bigip_nnic_handler_master, bigip_selfips, 0]}
       use_config_drive: {get_param: use_config_drive}
       wait_handle_curl: {get_attr: [wait_handle_onboard_cluster_master, curl_cli]}
   init_7_onboard_cluster_config_slave:
@@ -417,7 +417,7 @@ resources:
       auto_sync: {get_param: bigip_cluster_auto_sync}
       save_on_auto_sync: {get_param: bigip_cluster_save_on_auto_sync}
       host_name: {get_attr: [mgmt_port_slave, show, dns_assignment, 0, fqdn]}
-      config_sync_ip: {get_attr: [bigip_nnic_handler_slave, port_ips, 0]}
+      config_sync_ip: {get_attr: [bigip_nnic_handler_slave, bigip_selfips, 0]}
       use_config_drive: {get_param: use_config_drive}
       wait_handle_curl: {get_attr: [wait_handle_onboard_cluster_slave, curl_cli]}
   bigip_provision_master:
@@ -530,6 +530,15 @@ outputs:
   mgmt_port_id_master:
     description: The port id of the BIG-IP mgmt interface
     value: {get_resource: mgmt_port_master}
+  data_port_ids_master:
+    description: The port ids of the TMM interfaces
+    value: {get_attr: [bigip_nnic_handler_master, port_ids]}
+  data_fixed_ips_master:
+    description: The fixed_ips for the port of the TMM interfaces
+    value: {get_attr: [bigip_nnic_handler_master, port_fixed_ips]}
+  data_fixed_subnets_master:
+    description: The port ids of the TMM interfaces
+    value: {get_attr: [bigip_nnic_handler_master, port_subnets]}
   bigip_instance_id_slave:
     description: ID of the BIG-IP instance
     value: {get_resource: bigip_instance_slave}
@@ -548,3 +557,12 @@ outputs:
   mgmt_port_id_slave:
     description: The port id of the BIG-IP mgmt interface
     value: {get_resource: mgmt_port_slave}
+  data_port_ids_slave:
+    description: The port ids of the TMM interfaces
+    value: {get_attr: [bigip_nnic_handler_slave, port_ids]}
+  data_fixed_ips_slave:
+    description: The fixed_ips for the port of the TMM interfaces
+    value: {get_attr: [bigip_nnic_handler_slave, port_fixed_ips]}
+  data_fixed_subnets_slave:
+    description: The port ids of the TMM interfaces
+    value: {get_attr: [bigip_nnic_handler_slave, port_subnets]}
