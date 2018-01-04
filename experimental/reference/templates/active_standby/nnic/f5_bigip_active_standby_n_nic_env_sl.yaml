@@ -1,7 +1,7 @@
 ---
 parameters:
-  bigip_image: BIGIP-13.1.0.0.0.1868.ALL
-  bigip_flavor: m1.bigip.ALL.large
+  bigip_image: BIGIP-13.1.0.1.0.0.8.LTM_1SLOT
+  bigip_flavor: m1.bigip.LTM.small
   bigip_cluster_name: sync-failover
   bigip_cluster_sync_type: sync-failover
   bigip_cluster_auto_sync: false
@@ -40,9 +40,9 @@ parameters:
   # This should be a list of existing neutron subnets.
   network_vlan_subnets:
     - HA
-    - app_tier_1
-    - app_tier_2
-    - dmz1
+    - app_tier_1;app_tier_1;app_tier_1
+    - app_tier_2;app_tier_2;app_tier_2
+    - dmz1;dmz1
 
   # Rules to apply to the security groups to be created for the vlans.
   # Each group of rules is the same syntax as rules property of OS::Neutron::SecurityGroup
@@ -148,5 +148,7 @@ resource_registry:
   F5::BigIP::ManagementSecurityGroup: ../../../security_groups/bigip_mgmt_security_group.yaml
   F5::BigIP::CustomSecurityGroup: ../../../security_groups/bigip_custom_security_group.yaml
   F5::BigIP::NeutronPort: ../../../networks/bigip_neutron_port.yaml
+  F5::BigIP::NeutronPortSingleFixedIP: ../../../networks/bigip_neutron_port_single_fixed_ip.yaml
   F5::BigIP::NNicHandler: ../../../networks/bigip_nnic_handler.yaml
+  F5::BigIP::NNicHandlerSingleFixedIP: ../../../networks/bigip_nnic_handler_single_fixed_ip.yaml
   F5::BigIP::RunOnboardNetworkConfigs: ../../../configs/run_onboard_network_configs.yaml

@@ -9,25 +9,42 @@ parameters:
   bigip_modules:
     - ltm:nominal
 
+  f5_bigiq_host: 169.53.3.171
+  f5_bigiq_username: admin
+  f5_bigiq_password: openstack
+  f5_bigiq_license_pool_name: ve_10G_best_v13
+
+  # This should be an existing neutron network.
   external_network: public
 
+  # This should be an existing neutron network.
   mgmt_network: management
+
+  # Name to apply to the security group to be created for management network.
   mgmt_security_group_name: mgmt-secgroup-nnic
+
+
+  # This should be the number of additional nics, excluding mgmt (nic 1.0).
   bigip_nic_count: 4
+
+  # This is usually bigip_nic_count minus 1. (zero-based index)
+  # This determines which nic setup to wait to finish before triggering post_onboard.sh, where custom tmsh commands can be added.
   bigip_last_nic_index: 3
 
+  # This should be a list of existing neutron networks.
   network_vlan_names:
     - HA
     - app_tier_1
     - app_tier_2
     - dmz1
 
+  # This should be a list of existing neutron subnets.
   network_vlan_subnets:
-    - HA
+    - HA;HA;HA 
     - app_tier_1
     - app_tier_2
-    - dmz1 
-
+    - dmz1
+ 
   # Rules to apply to the security groups to be created for the vlans.
   # Each group of rules is the same syntax as rules property of OS::Neutron::SecurityGroup
   # JSON object { "security_group_rules": [ {"rules": [...] }, { "rules": [...] } ] }
@@ -124,6 +141,7 @@ parameters:
     # f5_cloudlibs_verify_hash_url_override: https://raw.githubusercontent.com/F5Networks/f5-cloud-libs/v3.3.2/dist/verifyHash
 
 resource_registry:
+  F5::BigIP::Standalone: ./f5_bigip_standalone_n_nic.yaml
   F5::BigIP::OverrideDefaultConfig: ../../../configs/override_default_config.yaml
   F5::BigIP::OnboardingLibs: ../../../configs/onboarding_libs.yaml
   F5::BigIP::OnboardingScripts: ../../../configs/onboarding_scripts.yaml

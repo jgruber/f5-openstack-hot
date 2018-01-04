@@ -2,6 +2,10 @@
 parameters:
   bigip_image: BIGIP-13.1.0.1.0.0.8.LTM_1SLOT
   bigip_flavor: m1.bigip.LTM.small
+  bigip_cluster_name: sync-failover
+  bigip_cluster_sync_type: sync-failover
+  bigip_cluster_auto_sync: false
+  bigip_cluster_save_on_auto_sync: false
   use_config_drive: true
   bigip_os_ssh_key: admin_mydemo_rocks
   bigip_admin_pwd: openstack
@@ -9,24 +13,41 @@ parameters:
   bigip_modules:
     - ltm:nominal
 
+  f5_bigiq_host: 169.53.3.171
+  f5_bigiq_username: admin
+  f5_bigiq_password: openstack
+  f5_bigiq_license_pool_name: ve_10G_best_v13
+
+  # This should be an existing neutron network.
   external_network: public
 
+  # This should be an existing neutron network.
   mgmt_network: management
+
+  # Name to apply to the security group to be created for management network.
   mgmt_security_group_name: mgmt-secgroup-nnic
+
+
+  # This should be the number of additional nics, excluding mgmt (nic 1.0).
   bigip_nic_count: 4
+
+  # This is usually bigip_nic_count minus 1. (zero-based index)
+  # This determines which nic setup to wait to finish before triggering post_onboard.sh, where custom tmsh commands can be added.
   bigip_last_nic_index: 3
 
+  # This should be a list of existing neutron networks.
   network_vlan_names:
     - HA
     - app_tier_1
     - app_tier_2
     - dmz1
 
+  # This should be a list of existing neutron subnets.
   network_vlan_subnets:
     - HA
-    - app_tier_1
-    - app_tier_2
-    - dmz1 
+    - app_tier_1;app_tier_1;app_tier_1;app_tier_1
+    - app_tier_2;app_tier_2;app_tier_2;app_tier_2
+    - dmz1;dmz1;dmz1
 
   # Rules to apply to the security groups to be created for the vlans.
   # Each group of rules is the same syntax as rules property of OS::Neutron::SecurityGroup
@@ -97,10 +118,10 @@ parameters:
     - 1400
 
   bigip_vlan_tags:
-    - 0
-    - 0
-    - 0
-    - 0
+    - None
+    - None
+    - None
+    - None
 
   bigip_vlan_names:
     - HA
@@ -124,12 +145,16 @@ parameters:
     # f5_cloudlibs_verify_hash_url_override: https://raw.githubusercontent.com/F5Networks/f5-cloud-libs/v3.3.2/dist/verifyHash
 
 resource_registry:
+  F5::BigIP::ActiveStandbyPair: ./f5_bigip_active_standby_n_nic.yaml
   F5::BigIP::OverrideDefaultConfig: ../../../configs/override_default_config.yaml
   F5::BigIP::OnboardingLibs: ../../../configs/onboarding_libs.yaml
   F5::BigIP::OnboardingScripts: ../../../configs/onboarding_scripts.yaml
   F5::BigIP::OnboardNetworkConfigIndexed: ../../../configs/onboarding_network_config_indexed.yaml
+  F5::BigIP::OnboardClusterConfig: ../../../configs/onboarding_cluster_config.yaml
   F5::BigIP::ManagementSecurityGroup: ../../../security_groups/bigip_mgmt_security_group.yaml
   F5::BigIP::CustomSecurityGroup: ../../../security_groups/bigip_custom_security_group.yaml
   F5::BigIP::NeutronPort: ../../../networks/bigip_neutron_port.yaml
+  F5::BigIP::NeutronPortSingleFixedIP: ../../../networks/bigip_neutron_port_single_fixed_ip.yaml
   F5::BigIP::NNicHandler: ../../../networks/bigip_nnic_handler.yaml
+  F5::BigIP::NNicHandlerSingleFixedIP: ../../../networks/bigip_nnic_handler_single_fixed_ip.yaml
   F5::BigIP::RunOnboardNetworkConfigs: ../../../configs/run_onboard_network_configs.yaml

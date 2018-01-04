@@ -1,7 +1,7 @@
 ---
 parameters:
-  bigip_image: BIGIP-13.0.0.2.0.1671.LTM_1SLOT
-  bigip_flavor: m1.bigip.1SLOT
+  bigip_image: BIGIP-13.1.0.1.0.0.8.LTM_1SLOT
+  bigip_flavor: m1.bigip.LTM.small
   use_config_drive: true
   bigip_os_ssh_key: admin_mydemo_rocks
   bigip_admin_pwd: openstack
