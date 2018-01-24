@@ -3,10 +3,24 @@ echo '*****ONBOARD STARTING******'
 
 #vars
 #some default values set by heat str_replace
-addOn_licenses="__add_on_licenses__"
+
+#licensing
+licenseKey="__license__"
+licenseOpt="--license"
+addOnLicenses="__add_on_licenses__"
+bigIqHost="__bigiq_host__"
+bigIqUsername="__bigiq_username__"
+bigIqLicPool="__bigiq_lic_pool__"
+bigIqUseAltMgmtIp="__bigiq_use_alt_mgmt_ip__"
+bigIqAltMgmtIp="__bigiq_alt_mgmt_ip__"
+bigIqAltMgmtPort="__bigiq_alt_mgmt_port__"
+bigIqPwdUri="file:///config/cloud/openstack/bigIqPwd"
+bigIqMgmtIp=""
+bigIqMgmtPort=""
+
 dns="__dns__"
 hostName="__host_name__"
-mgmtIp="__mgmt_ip__"
+mgmtPortId="__mgmt_port_id__"
 adminPwd=""
 newRootPwd=""
 oldRootPwd=""
@@ -14,28 +28,56 @@ msg=""
 stat="FAILURE"
 logFile="/var/log/onboard.log"
 
+allowUsageAnalytics="__allow_ua__"
+templateName="__template_name__"
+templateVersion="__template_version__"
+cloudLibsTag="__cloudlibs_tag__"
+custId=$(echo "__cust_id__"|sha512sum|cut -d " " -f 1)
+deployId=$(echo "__deploy_id__"|sha512sum|cut -d " " -f 1)
+region="__region__"
+metrics=""
+metricsOpt=""
+licenseType="__license_type__"
+
 function set_vars() {
-    if [ "$addOn_licenses" == "--add-on None" ]; then
-        addOn_licenses="" 
+    if [ "$addOnLicenses" == "--add-on None" ]; then
+        addOnLicenses=""
     fi
 
     if [ "$dns" == "--dns None" ]; then
         dns=""
     fi
 
-    #remove trailing . from fqdn
-    hostName=${hostName%.}
-    if [[ $hostName == "" ]]; then
-        # echo 'building hostname manually - no fqdn returned from neutron port assignment'
-        # dnsSuffix=$(/bin/grep search /etc/resolv.conf | awk '{print $2}')
-        # hostName="host-$mgmtIp.$dnsSuffix"
-        configDriveDest="/mnt/config"
-        echo 'Attempting to retrieve hostname from metadata'
-        if [[ "$useConfigDrive" == "True" ]]; then
-            hostName=$(python -c 'import sys, json; print json.load(sys.stdin)["hostname"]' <"$configDriveDest"/openstack/latest/meta_data.json)
-        else
-            hostName=$(curl -s -f --retry 20 http://169.254.169.254/latest/meta-data/hostname)
+    if [ "$licenseType" == "BIGIQ" ]; then
+        if [ "$bigIqUseAltMgmtIp" == "True" ]; then
+            bigIqMgmtIp="--big-ip-mgmt-address ${bigIqAltMgmtIp}"
+
+            if [ "$bigIqAltMgmtPort" != "None" ]; then
+                bigIqMgmtPort="--big-ip-mgmt-port ${bigIqAltMgmtPort}"
+            fi
         fi
+        licenseOpt="--license-pool"
+        license="--license-pool-name ${bigIqLicPool} --big-iq-host ${bigIqHost} --big-iq-user ${bigIqUsername} --big-iq-password-uri ${bigIqPwdUri} ${bigIqMgmtIp} ${bigIqMgmtPort}"
+    else
+        if [ "${licenseKey,,}" == "none" ]; then
+            license=""
+            licenseOpt=""
+        else
+            license="${licenseKey}"
+        fi
+    fi
+
+    if [[ "$hostName" == "" || "$hostName" == "None" ]]; then
+        echo 'using mgmt neutron portid as hostname - no fqdn returned from neutron port assignment'
+        # get first matching domain
+        dnsSuffix=$(/bin/grep search /etc/resolv.conf | awk '{print $2}')
+        if [[ "$dnsSuffix" == "" ]]; then
+            dnsSuffix="openstacklocal"
+        fi
+            hostName="host-$mgmtPortId.$dnsSuffix"
+    else
+        #remove trailing . from fqdn
+        hostName=${hostName%.}
     fi
 
     onboardRun=$(grep "Starting Onboard call" -i -c -m 1 "$logFile" )
@@ -43,11 +85,18 @@ function set_vars() {
         echo 'WARNING: onboard already previously ran.'
         oldRootPwd=$(</config/cloud/openstack/rootPwd)
     else
-        oldRootPwd=$(</config/cloud/openstack/rootPwdRandom)
+        oldRootPwd=$(</config/cloud/openstack/rootPwd)
     fi
 
     adminPwd=$(</config/cloud/openstack/adminPwd)
     newRootPwd=$(</config/cloud/openstack/rootPwd)
+
+    if [[ "$allowUsageAnalytics" == "True" ]]; then
+        bigIpVersion=$(tmsh show sys version | grep -e "Build" -e " Version" | awk '{print $2}' ORS=".")
+        metrics="customerId:${custId},deploymentId:${deployId},templateName:${templateName},templateVersion:${templateVersion},region:${region},bigIpVersion:${bigIpVersion},licenseType:${licenseType},cloudLibsVersion:${cloudLibsTag},cloudName:openstack"
+        metricsOpt="--metrics"
+        echo "$metrics"
+    fi
 }
 
 function set_adminPwd() {
@@ -56,21 +105,13 @@ function set_adminPwd() {
 
 function onboard_run() {
     echo 'Starting Onboard call'
-
-    basekey="__license__"
-    license_option="--license"
-    if [ "${basekey,,}" == "none" ]; 
-    then
-        license_option=""
-        basekey=""
-    fi     
-
     if f5-rest-node /config/cloud/openstack/node_modules/f5-cloud-libs/scripts/onboard.js \
-        $addOn_licenses \
+        $metricsOpt $metrics \
+        $addOnLicenses \
         $dns \
         --host localhost \
         --hostname "$hostName" \
-        $license_option "$basekey" \
+        $licenseOpt $license \
         --log-level debug \
         __modules__ \
         __ntp__ \
@@ -94,6 +135,7 @@ function onboard_run() {
                 msg="Onboard command exited without error."
                 stat="SUCCESS"
             fi
+
         fi
     else
         msg='Onboard exited with an error signal.'

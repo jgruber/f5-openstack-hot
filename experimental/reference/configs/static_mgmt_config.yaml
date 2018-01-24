@@ -1,0 +1,78 @@
+heat_template_version: 2016-04-08
+
+description: This template contains static management nic config for a standard f5 standalone VE image.
+
+parameters:
+  interface_name:
+    type: string
+    label: Interface Name
+    description: Name of the management interface to be configured
+    default: mgmt
+  mtu:
+    type: number
+    label: Interface MTU
+    description: MTU to use for the management interface
+    default: 1400
+  ip_address:
+    type: string
+    label: IP Address
+    description: IP Address to assign to the interface
+  cidr:
+    type: string
+    label: CIDR
+    description: Network CIDR for the interface
+  gateway:
+    type: string
+    label: Gateway
+    description: Gateway to associate with the interface
+    default: None
+  dns_nameservers:
+    type: comma_delimited_list
+    label: DNS Servers
+    description: DNS Servers to add
+    default:
+      -
+  wait_handle_curl:
+    type: string
+    label: Wait Handle
+    description: Resolved curl_cli value of the WaitConditionHandle that enables status signals to be sent back to Heat
+
+resources:
+  static_mgmt_config:
+    type: OS::Heat::CloudConfig
+    properties:
+      cloud_config:
+        merge_how: dict(recurse_array,no_replace)+list(append)
+        write_files:
+          - path: /config/setup-staticMgmt.sh
+            permissions: 0755
+            owner: root:root
+            content:
+              str_replace:
+                params:
+                  __nic__: { get_param: interface_name }
+                  __mtu__: { get_param: mtu }
+                  __addr__: { get_param: ip_address }
+                  __cidr__: { get_param: cidr }
+                  __gateway__: { get_param: gateway }
+                  __dns__: { get_param: dns_nameservers }
+                  wc_notify: { get_param: wait_handle_curl }
+                template: { get_file: ../scripts/setup-staticMgmt.sh }
+          - path: /config/wait-staticMgmtConfig.sh
+            permissions: 0755
+            owner: root:root
+            content: { get_file: ../scripts/wait-staticMgmtConfig.sh }
+          - path: /config/wait-cloudlibsDownload.sh
+            permissions: 0755
+            owner: root:root
+            content: { get_file: ../scripts/wait-cloudlibsDownload.sh }
+        bootcmd:
+          - echo '******BOOT COMMAND START*******'
+          - /usr/bin/setdb dhclient.mgmt disable && echo '*** disabled dhclient'
+          - echo '******BOOT COMMAND END*******'
+
+outputs:
+  OS::stack_id:
+    description: F5::BigIP::StaticMgmtConfig resource.
+    value:
+      get_resource: static_mgmt_config

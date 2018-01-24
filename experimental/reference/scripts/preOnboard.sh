@@ -22,28 +22,30 @@ while [ $checks -lt 120 ]; do echo checking mcpd
     let checks=checks+1
     sleep 10
 done
-echo loading verifyHash script
-if ! tmsh load sys config merge file /config/verifyHash; then
-    echo cannot validate signature of /config/verifyHash
-    msg="Unable to validate verifyHash."
-fi
-echo loaded verifyHash
-declare -a filesToVerify=(/config/cloud/openstack/f5-cloud-libs.tar.gz)
-for fileToVerify in "${filesToVerify[@]}"
-do
-    echo verifying "$fileToVerify"
-    if ! tmsh run cli script verifyHash "$fileToVerify"; then
-        echo "$fileToVerify" is not valid
-        msg="Unable to verify one or more files."
-    fi
-    echo verified "$fileToVerify"
-done
+
+#echo 'loading verifyHash script'
+#if ! tmsh load sys config merge file /config/verifyHash; then
+#    echo cannot validate signature of /config/verifyHash
+#    msg="Unable to validate verifyHash."
+#fi
+#echo 'loaded verifyHash'
+#declare -a filesToVerify=("/config/cloud/openstack/f5-cloud-libs.tar.gz" "/config/cloud/openstack/f5-cloud-libs-openstack.tar.gz")
+#for fileToVerify in "${filesToVerify[@]}"
+#do
+#    echo verifying "$fileToVerify"
+#    if ! tmsh run cli script verifyHash "$fileToVerify"; then
+#        echo "$fileToVerify" is not valid
+#        msg="Unable to verify one or more files."
+#    fi
+#    echo verified "$fileToVerify"
+#done
 
 #*************************************************************************************************
 if [[ "$msg" == "" ]]; then
     echo 'Preparing CloudLibs'
     mkdir -p /config/cloud/openstack/node_modules
     tar xvfz /config/cloud/openstack/f5-cloud-libs.tar.gz -C /config/cloud/openstack/node_modules
+    tar --warning=no-unknown-keyword -zxf /config/cloud/openstack/f5-cloud-libs-openstack.tar.gz -C /config/cloud/openstack/node_modules/f5-cloud-libs/node_modules > /dev/null
     touch /config/cloud/openstack/cloudLibsReady
 fi
 
@@ -73,7 +75,7 @@ else
     echo 'Adding SSH Key from Metadata service'
     declare -r tempKey="/config/cloud/openstack/os-ssh-key.pub"
     if curl http://169.254.169.254/latest/meta-data/public-keys/0/openssh-key -s -f --retry 5   --retry-max-time 300 --retry-delay 10 -o $tempKey ; then
-        (head -n1 $tempKey) >> /root/.ssh/authorized_keys 
+        (head -n1 $tempKey) >> /root/.ssh/authorized_keys
         rm $tempKey
     else
         msg="Pre-onboard failed: Unable to inject SSH key from metadata service."
@@ -84,7 +86,7 @@ fi
 
 #*************************************************************************************************
 #buffer wait before sending heat signal
-sleep 120
+#sleep 120
 
 if [[ "$msg" == "" ]]; then
     stat="SUCCESS"

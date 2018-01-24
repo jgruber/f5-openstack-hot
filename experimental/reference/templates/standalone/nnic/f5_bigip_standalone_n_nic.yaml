@@ -27,7 +27,6 @@ parameters:
     type: string
     label: f5 BIG-IP VE Flavor
     description: Type of instance (flavor) to be used for the VE.
-    default: m1.medium
     constraints:
       - custom_constraint: nova.flavor
   use_config_drive:
@@ -39,7 +38,7 @@ parameters:
     type: string
     label: f5 CloudLibs Tag
     description: Tag that determines version of f5 cloudlibs to use for provisioning. If specified, ensure that hashes are valid by either updating scripts/verifyHash or by providing a f5_cloudlibs_verify_hash_url_override value.
-    default: v3.3.0
+    default: v3.5.0
   f5_cloudlibs_url_override:
     type: string
     label: f5 cloud-libs URL Override
@@ -49,6 +48,16 @@ parameters:
     type: string
     label: f5 cloud-libs verifyHash URL Override
     description: Alternate URL for verifyHash used to validate f5-cloud-libs package. If not specified, the scripts/verifyHash will be used.
+    default: None
+  f5_cloudlibs_openstack_tag:
+    type: string
+    label: f5-cloud-libs-openstack Tag
+    description: Tag that determines version of f5 cloudlibs-package to use for provisioning. If specified, ensure that hashes are valid by either updating scripts/verifyHash or by providing a f5_cloudlibs_verify_hash_url_override value.
+    default: v1.0.0
+  f5_cloudlibs_openstack_url_override:
+    type: string
+    label: f5-cloud-libs-openstack URL Override
+    description: Alternate URL for f5-cloud-libs-openstack package. If not specified, the default GitHub location for f5-cloud-libs will be used. If version is different from default f5_cloudlibs_tag, ensure that hashes are valid by either updating scripts/verifyHash or by providing a f5_cloudlibs_verify_hash_url_override value.
     default: None
   bigip_servers_ntp:
     type: comma_delimited_list
@@ -63,6 +72,11 @@ parameters:
     description: A list of DNS servers to configure on the BIG-IP.
     default:
       -
+  allow_usage_analytics:
+    type: boolean
+    label: Allow Usage Analytics
+    description: Toggles whether non-identifiable statistical information is sent to F5.
+    default: true
 
   # bigip nnic provisioning
   bigip_nic_count:
@@ -71,12 +85,6 @@ parameters:
     description: Number of additional NICs to attach to the BIG-IP. Note - exclude management nic from count.
     constraints:
       - range: {min: 1, max: 10}
-  bigip_last_nic_index:
-    type: number
-    label: f5 BIG-IP last NIC index (0-based)
-    description: Index of the last NIC setup to wait to finish. This is usually bigip_nic_count minus 1. Since there are no intrinsic math functions currently supported in heat, this parameter is required.
-    constraints:
-      - range: {min: 0, max: 9}
 
   # bigip credentials
   bigip_os_ssh_key:
@@ -128,6 +136,11 @@ parameters:
     description: Network to which the BIG-IP management interface is attached.
     constraints:
       - custom_constraint: neutron.network
+  mgmt_mtu:
+    type: number
+    label: Management Interface MTU
+    description: Network MTU for the BIG-IP management interface.
+    default: 1400
   mgmt_security_group_name:
     type: string
     label: Management Security Group Name
@@ -189,12 +202,14 @@ parameter_groups:
       - f5_cloudlibs_tag
       - f5_cloudlibs_url_override
       - f5_cloudlibs_verify_hash_url_override
+      - f5_cloudlibs_openstack_tag
+      - f5_cloudlibs_openstack_url_override
       - bigip_servers_ntp
       - bigip_servers_dns
+      - allow_usage_analytics
   - label: BIG-IP nNIC Provisioning
     parameters:
       - bigip_nic_count
-      - bigip_last_nic_index
   - label: BIG-IP Credentials
     parameters:
       - bigip_os_ssh_key
@@ -209,6 +224,7 @@ parameter_groups:
     parameters:
       - external_network
       - mgmt_network
+      - mgmt_mtu
       - mgmt_security_group_name
       - network_vlan_security_group_rules
       - network_vlan_names
@@ -223,6 +239,14 @@ parameter_groups:
       - bigip_self_port_lockdowns
 
 resources:
+  wait_condition_static_mgmt_config_complete:
+    type: OS::Heat::WaitCondition
+    properties:
+      handle: {get_resource: wait_handle_static_mgmt_config}
+      count: 1
+      timeout: 600
+  wait_handle_static_mgmt_config:
+    type: OS::Heat::WaitConditionHandle
   wait_condition_onboard_complete:
     type: OS::Heat::WaitCondition
     properties:
@@ -235,7 +259,7 @@ resources:
     type: OS::Heat::WaitCondition
     properties:
       handle: {get_resource: wait_handle_onboard_network}
-      count: {get_param: bigip_nic_count}
+      count: 1
       timeout: 1800
   wait_handle_onboard_network:
     type: OS::Heat::WaitConditionHandle
@@ -261,7 +285,6 @@ resources:
     type: F5::BigIP::NNicHandler
     properties:
       bigip_nic_count: {get_param: bigip_nic_count}
-      bigip_last_nic_index: {get_param: bigip_last_nic_index}
       network_vlan_names: {get_param: network_vlan_names}
       network_vlan_subnets: {get_param: network_vlan_subnets}
       network_vlan_security_group_rules: {get_param: network_vlan_security_group_rules}
@@ -271,31 +294,59 @@ resources:
       bigip_self_port_lockdowns: {get_param: bigip_self_port_lockdowns}
       bigip_default_gateway: {get_param: bigip_default_gateway}
       wait_handle_curl: {get_attr: [wait_handle_onboard_network, curl_cli]}
+  init_0_static_mgmt_config:
+    type: F5::BigIP::StaticMgmtConfig
+    properties:
+      interface_name: mgmt
+      mtu: {get_param: mgmt_mtu}
+      ip_address: { get_attr: [mgmt_port, fixed_ips, 0, ip_address] }
+      cidr: { get_attr: [mgmt_port, subnets, 0, cidr] }
+      gateway: { get_attr: [mgmt_port, subnets, 0, gateway_ip] }
+      dns_nameservers: { get_attr: [mgmt_port, subnets, 0, dns_nameservers] }
+      wait_handle_curl: { get_attr: [wait_handle_static_mgmt_config, curl_cli] }
   init_1_override_default_config:
     type: F5::BigIP::OverrideDefaultConfig
     properties:
       admin_password: {get_param: bigip_admin_pwd}
       root_password: {get_param: bigip_root_pwd}
   init_2_onboard_libs:
+    type: OS::Heat::CloudConfig
+    properties:
+      cloud_config:
+        merge_how: dict(recurse_array,no_replace)+list(append)
+        write_files:
+          - path: /config/download-cloudlibs.sh
+            permissions: 0755
+            owner: root:root
+            content: { get_attr: [onboard_libs, config] }
+  onboard_libs:
     type: F5::BigIP::OnboardingLibs
     properties:
-      cloudlibs_tag: {get_param: f5_cloudlibs_tag}
-      cloudlibs_url_override: {get_param: f5_cloudlibs_url_override}
+      cloudlibs_tag: { get_param: f5_cloudlibs_tag }
+      cloudlibs_url_override: { get_param: f5_cloudlibs_url_override }
+      cloudlibs_os_tag: { get_param: f5_cloudlibs_openstack_tag }
+      cloudlibs_os_url_override: { get_param: f5_cloudlibs_openstack_url_override }
   init_3_onboard_scripts:
     type: F5::BigIP::OnboardingScripts
     properties:
-      verify_hash_url_override: {get_param: f5_cloudlibs_verify_hash_url_override}
-      bigip_addon_licenses: {get_param: bigip_addon_license_keys}
-      bigip_license: {get_param: bigip_license_key}
-      modules: {get_param: bigip_modules}
-      ntp: {get_param: bigip_servers_ntp}
-      dns: {get_param: bigip_servers_dns}
-      host_name: {get_attr: [mgmt_port, show, dns_assignment, 0, fqdn]}
-      management_ip: {get_attr: [mgmt_port, fixed_ips, 0, ip_address]}
-      management_port: {get_param: bigip_mgmt_port}
-      ssh_key_name: {get_param: bigip_os_ssh_key}
-      use_config_drive: {get_param: use_config_drive}
-      wait_handle_curl: {get_attr: [wait_handle_onboard, curl_cli]}
+      verify_hash_url_override: { get_param: f5_cloudlibs_verify_hash_url_override}
+      bigip_addon_licenses: { get_param: bigip_addon_license_keys }
+      bigip_license: { get_param: bigip_license_key }
+      modules: { get_param: bigip_modules }
+      ntp: { get_param: bigip_servers_ntp }
+      dns: { get_param: bigip_servers_dns }
+      host_name: { get_attr: [mgmt_port, show, dns_assignment, 0, fqdn] }
+      management_port_id: { get_resource: mgmt_port }
+      management_port: { get_param: bigip_mgmt_port }
+      ssh_key_name: { get_param: bigip_os_ssh_key }
+      use_config_drive: { get_param: use_config_drive }
+      wait_handle_curl: { get_attr: [wait_handle_onboard, curl_cli] }
+      ua_allow: { get_param: allow_usage_analytics }
+      ua_cloudlibs_tag: { get_param: f5_cloudlibs_tag }
+      ua_project_id: { get_param: 'OS::project_id'}
+      ua_stack_id: { get_param: 'OS::stack_id' }
+      ua_template_name: exp-f5_bigip_standalone_n_nic.yaml
+      ua_template_version: 3.0.0
   bigip_provision:
     type: OS::Heat::MultipartMime
     properties:
@@ -310,12 +361,13 @@ resources:
                 -
                   list_join:
                     - ','
+                    - [{get_resource: init_0_static_mgmt_config}]
                     - [{get_resource: init_1_override_default_config}]
                     - [{get_resource: init_2_onboard_libs}]
                     - [{get_resource: init_3_onboard_scripts}]
-                    - {get_attr: [bigip_nnic_handler, init_4_onboard_network_configs]}
-                    - [{get_attr: [bigip_nnic_handler, init_5_run_core_commands]}]
-                    - [{get_attr: [bigip_nnic_handler, init_6_run_network_commands]}]
+                    - [{get_attr: [bigip_nnic_handler, init_4_onboard_network_config]}]
+                    - [{get_attr: [bigip_nnic_handler, init_5_run_core_commands_static_mgmt]}]
+
   bigip_instance:
     type: OS::Nova::Server
     depends_on: bigip_nnic_handler
