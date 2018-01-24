@@ -4,27 +4,17 @@ echo '******Starting Cluster Configuration******'
 msg=""
 stat="FAILURE"
 deviceName="__host_name__"
-deviceName=${deviceName%.}
+
 masterIp="__master_mgmt_ip__"
+mgmtIp="__mgmt_ip__"
 configSyncIp="__config_sync_ip__"
-useConfigDrive="__use_config_drive__"
 autoSync="__auto_sync__"
 saveOnAutoSync="__save_on_auto_sync__"
-
-if [[ $deviceName == "" ]]; then
-    configDriveDest="/mnt/config"
-    echo 'Attempting to retrieve hostname from metadata'
-    if [[ "$useConfigDrive" == "True" ]]; then
-        deviceName=$(python -c 'import sys, json; print json.load(sys.stdin)["hostname"]' <"$configDriveDest"/openstack/latest/meta_data.json)
-    else
-        deviceName=$(curl -s -f --retry 20 http://169.254.169.254/latest/meta-data/hostname)
-    fi
-fi
 
 if [[ "$autoSync" == "True" ]]; then
     autoSync="--auto-sync"
 
-    if [[ "$saveOnAutoSync=" == "True" ]]; then
+    if [[ "$saveOnAutoSync" == "True" ]]; then
         saveOnAutoSync="--save-on-auto-sync"
     else
         saveOnAutoSync=""
@@ -34,21 +24,33 @@ else
 fi
 
 isMaster=false
-if [[ "__mgmt_ip__" == "$masterIp" ]]; then
+if [[ "$mgmtIp" == "$masterIp" ]]; then
     isMaster=true
 fi
 
 deviceCurr=$(tmsh list cm device | grep bigip1 -c)
 if [[ "$deviceCurr" -gt 0 ]]; then
-    echo 'Warning: DeviceName is showing as default bigip1. Manually changing'
-    tmsh mv cm device bigip1 "$deviceName"
+  echo 'Warning: DeviceName is showing as default bigip1. Manually changing'
+
+  if [[ "$deviceName" == "" || "$deviceName" == "None"  ]]; then
+    echo 'building hostname manually - no fqdn returned from neutron port assignment'
+    dnsSuffix=$(/bin/grep search /etc/resolv.conf |n awk '{print $2}')
+    hostName="host-$mgmtIp.$dnsSuffix"
+  else
+    deviceName=${deviceName%.}
+  fi
+  tmsh mv cm device bigip1 "$deviceName"
+else
+  hostName=$(tmsh list cm device one-line | awk '{print $3}')
+  echo "Using hostName: $hostName"
+  deviceName="$hostName"
 fi
 
 echo 'Configuring config-sync ip'
 tmsh modify cm device "$deviceName" configsync-ip $configSyncIp unicast-address { { effective-ip $configSyncIp effective-port 1026 ip $configSyncIp } }
 
-if [[ "$isMaster" == true ]] ; then 
-echo 'Master device'
+if [[ "$isMaster" == true ]] ; then
+echo 'Config-Sync Master device'
     f5-rest-node /config/cloud/openstack/node_modules/f5-cloud-libs/scripts/cluster.js \
     -o /var/log/onboard-cluster.log \
     --log-level debug \
@@ -64,7 +66,7 @@ echo 'Master device'
     "$autoSync" \
     "$saveOnAutoSync"
 else
-echo 'Standby device'
+echo 'Config-Sync Secondary device'
     f5-rest-node /config/cloud/openstack/node_modules/f5-cloud-libs/scripts/cluster.js \
     -o /var/log/onboard-cluster.log \
     --log-level debug \
@@ -77,7 +79,7 @@ echo 'Standby device'
     --sync \
     --remote-host __master_mgmt_ip__ \
     --remote-user admin \
-    --remote-password-url file:///config/cloud/openstack/adminPwd 
+    --remote-password-url file:///config/cloud/openstack/adminPwd
 
 fi
 

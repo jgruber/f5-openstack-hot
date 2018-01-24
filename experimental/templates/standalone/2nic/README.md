@@ -5,20 +5,24 @@
 [![Issues](https://img.shields.io/github/issues/f5networks/f5-openstack-hot.svg)](https://github.com/f5networks/f5-openstack-hot/issues)
 
 ## Introduction
- 
+
 This solution uses a Heat Orchestration Template to launch a 2-NIC deployment of a BIG-IP VE in an Openstack Private Cloud. In a 2-NIC implementation, one interface is for management and data-plane traffic from the Internet, and the second interface is connected into the networks where traffic is processed by the pool members in a traditional two-ARM design. Traffic flows from the BIG-IP VE to the application servers.
 
-The **standalone** heat orchestration template incorporates existing networks defined in Neutron. 
+The BIG-IP VE has the <a href="https://f5.com/products/big-ip/local-traffic-manager-ltm">Local Traffic Manager</a> (LTM) module enabled to provide advanced traffic management functionality. This means you can also configure the BIG-IP VE to enable F5's L4/L7 security features, access control, and intelligent traffic management.
+
+The **standalone** heat orchestration template incorporates existing networks defined in Neutron.
 
 ## Prerequisites and Configuration Notes
-  - Management Interface IP is determined via DHCP. 
-  - You must provide an additional network interface static IP address. If you want to use DHCP, the template can be modified to remove the **fixed_ips** property for the port. 
+  - Management Interface IP is determined via DHCP.
+  - You must provide an additional network interface static IP address. If you want to use DHCP, the template can be modified to remove the **fixed_ips** property for the port.
   - If you do not specify a URL override (the parameter name is **f5_cloudlibs_url_override**), the default location is GitHub and the subnet for the management network requires a route and access to the Internet for the initial configuration to download the BIG-IP cloud library.
   - If you specify a value for **f5_cloudlibs_url_override** or **f5_cloudlibs_tag**, ensure the corresponding hashes are valid by either updating **scripts/verifyHash** or by providing a **f5_cloudlibs_verify_hash_url_override** value.
   - **Important**: This [article](https://support.f5.com/csp/article/K13092#userpassword) contains links to information regarding BIG-IP user and password management. Please take note of the following when supplying password values:
       - The BIG-IP version and any default policies that may apply
       - Any characters you should avoid
   - This template leverages the built in heat resource type *OS::Heat::WaitCondition* to track status of onboarding by sending signals to the orchestration API.
+  - This template can send non-identifiable statistical information to F5 Networks to help us improve our templates. See [Sending statistical information to F5](#sending-statistical-information-to-f5).
+  - In order to pass traffic from your clients to the servers, after launching the template, you must create virtual server(s) on the BIG-IP VE.
 
 ## Security
 This Heat Orchestration Template downloads helper code to configure the BIG-IP system. If you want to verify the integrity of the template, you can open and modify definition of **verifyHash** file in **/scripts/verifyHash**.
@@ -35,16 +39,17 @@ For more information, please refer to:
  - BIG-IP Virtual Edition Image Version 13.0 or later
  - OpenStack Mitaka Deployment
 
-### Help
+### Getting Help
 While this template has been created by F5 Networks, it is in the experimental directory and therefore has not completed full testing and is subject to change.  F5 Networks does not offer technical support for templates in the experimental directory. For supported templates, see the templates in the **supported** directory.
 
-We encourage you to use our [Slack channel](https://f5cloudsolutions.herokuapp.com) for discussion and assistance on F5 Cloud templates.  This channel is typically monitored Monday-Friday 9-5 PST by F5 employees who will offer best-effort support.
+**Community Support**  
+We encourage you to use our [Slack channel](https://f5cloudsolutions.herokuapp.com) for discussion and assistance on F5 OpenStack Heat Orchestration templates. There are F5 employees who are members of this community who typically monitor the channel Monday-Friday 9-5 PST and will offer best-effort assistance. This slack channel community support should **not** be considered a substitute for F5 Technical Support. See the [Slack Channel Statement](https://github.com/F5Networks/f5-openstack-hot/blob/master/slack-channel-statement.md) for guidelines on using this channel.
 
 ## Launching Stacks
 
-1. Ensure the prerequisites are configured in your environment. See README from this project's root folder. 
-2. Clone this repository or manually download the contents (zip/tar). As the templates use nested stacks and referenced components, we recommend you retain the project structure as is for ease of deployment. If any of the files changed location, make sure that the corresponding paths are updated in the environment files. 
-3. Locate and update the environment file (_env.yaml) with the appropriate parameter values. Note that some default values will be used if no value is specified for an optional parameter. 
+1. Ensure the prerequisites are configured in your environment. See README from this project's root folder.
+2. Clone this repository or manually download the contents (zip/tar). As the templates use nested stacks and referenced components, we recommend you retain the project structure as is for ease of deployment. If any of the files changed location, make sure that the corresponding paths are updated in the environment files.
+3. Locate and update the environment file (_env.yaml) with the appropriate parameter values. Note that some default values will be used if no value is specified for an optional parameter.
 4. Launch the stack using the OpenStack CLI with a command using the following syntax:
 
 #### CLI Syntax
@@ -56,7 +61,7 @@ openstack stack create stack-2NIC-test -t src/f5-openstack-hot/experimental/temp
 ```
 
 ### Parameters
-The following parameters can be defined in your environment file. 
+The following parameters can be defined in your environment file.
 <br>
 
 #### BIG-IP General Provisioning
@@ -68,8 +73,12 @@ The following parameters can be defined in your environment file.
 | use_config_drive | No | Use config drive to provide meta and user data. With the default value of false, the metadata service is used instead. |  |
 | f5_cloudlibs_tag | No | Tag that determines version of F5 cloudlibs to use for provisioning (onboard helper).  |  |
 | f5_cloudlibs_url_override | No | Alternate URL for f5-cloud-libs package. If not specified, the default GitHub location for f5-cloud-libs will be used. If version is different from default f5_cloudlibs_tag, ensure that hashes are valid by either updating scripts/verifyHash or by providing a f5_cloudlibs_verify_hash_url_override value.  |  |
+| f5_cloudlibs_verify_hash_url_override | No | Alternate URL for the verifyHash file.  |  |
+| f5_cloudlibs_openstack_tag | No | Tag that determines version of F5 cloudlibs-openstack to use for provisioning (onboard helper).  |  |
+| f5_cloudlibs_openstack_url_override |  | Alternate URL for f5-cloud-libs-openstack package. If not specified, the default GitHub location for f5-cloud-libs is used. If version is different from default f5_cloudlibs_tag, ensure that hashes are valid by either updating scripts/verifyHash or by providing a f5_cloudlibs_verify_hash_url_override value.  |  |
 | bigip_servers_ntp | No | A list of NTP servers to configure on the BIG-IP VE. |  |
 | bigip_servers_dns | No | A list of DNS servers to configure on the BIG-IP VE. |  |
+| allow_usage_analytics | No | This deployment can send anonymous statistics to F5 to help us determine how to improve our solutions. If you select No, statistics are not sent.  |  |
 
 #### BIG-IP Credentials
 
@@ -83,7 +92,7 @@ The following parameters can be defined in your environment file.
 
 | Parameter | Required | Description | Constraints |
 | --- | :---: | --- | --- |
-| bigip_license_key | Yes | Primary BIG-IP VE License Base Key |  |
+| bigip_license_key | No | Primary BIG-IP VE License Base Key |  |
 | bigip_addon_license_keys | No | Additional BIG-IP VE License Keys |  |
 | bigip_modules | No | Modules to provision on the BIG-IP VE.  The default is `ltm:nominal` | Syntax: List of `module:level`. See [Parameter Values](#parameter-values) |
 
@@ -115,12 +124,28 @@ The following parameters can be defined in your environment file.
 <br>
 
 ### Parameter Values
-bigip_modules: 
+bigip_modules:
  - modules: [afm,am,apm,asm,avr,dos,fps,gtm,ilx,lc,ltm,pem,swg,urldb]
- - levels: [custom,dedicated,minimum,nominal,none] 
+ - levels: [custom,dedicated,minimum,nominal,none]
+### Sending statistical information to F5
+All of the F5 templates now have an option to send anonymous statistical data to F5 Networks to help us improve future templates.  
+None of the information we collect is personally identifiable, and only includes:
+
+- Customer ID: this is a hash of the project ID, not the actual ID
+- Deployment ID: hash of stack ID
+- F5 template name
+- F5 template version
+- Cloud Name
+- Region: this is a hash of the region (if supplied as parameter)
+- BIG-IP version
+- F5 license type
+- F5 Cloud libs version
+- F5 script name
+
+This information is critical to the future improvements of templates, but should you decide to select **No**, information will not be sent to F5.
 
 ## Filing Issues
-If you find an issue, we would love to hear about it. 
+If you find an issue, we would love to hear about it.
 You have a choice when it comes to filing issues:
   - Use the **Issues** link on the GitHub menu bar in this repository for items such as enhancement or feature requests and non-urgent bug fixes. Tell us as much as you can about what you found and how you found it.
 

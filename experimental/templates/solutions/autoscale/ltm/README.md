@@ -1,4 +1,4 @@
-# Deploying the BIG-IP in OpenStack - ConfigSync Cluster (Active/Active)
+# Deploying the BIG-IP in OpenStack - Autoscale BIG-IP LTM - Heat Autoscaling Group
 
 [![Slack Status](https://f5cloudsolutions.herokuapp.com/badge.svg)](https://f5cloudsolutions.herokuapp.com)
 [![Releases](https://img.shields.io/github/release/f5networks/f5-openstack-hot.svg)](https://github.com/f5networks/f5-openstack-hot/releases)
@@ -6,27 +6,35 @@
 
 ## Introduction
 
-This solution uses a Heat Orchestration Template to launch and configure two BIG-IP 2-NIC VEs in a clustered, highly available configuration in an OpenStack Private Cloud.
+This solution uses a Heat template to launch the deployment of F5 Virtual Edition (VE) instances in **OS::Heat::AutoScalingGroup** that can scale arbitrary resources. The BIG-IP VEs have the <a href="https://f5.com/products/big-ip/local-traffic-manager-ltm">Local Traffic Manager</a> (LTM) module enabled to provide advanced traffic management functionality.
 
-In a 2-NIC implementation, each BIG-IP VE has one interface used for management and data-plane traffic from the Internet, and the second interface connected into the Neutron networks where traffic is processed by the pool members in a traditional two-ARM design. Traffic flows from the BIG-IP VE to the application servers.
+In this auto scale solution, as thresholds are met, the number of BIG-IP VE LTM instances automatically increases or decreases accordingly. Scaling thresholds are by default based on **network.incoming.bytes.rate** meter. The meter type can be changed by providing the parameter value. This solution is for BIG-IP LTM only.
 
-The **cluster** heat orchestration template incorporates existing networks defined in Neutron.
+The BIG-IP VE(s) are configured in 2-NIC mode. In a 2-NIC implementation, each BIG-IP VE has one interface used for management and data-plane traffic from the Internet, and the second interface connected into the Neutron networks where traffic is processed by the pool members in a traditional two-ARM design. Traffic flows from the BIG-IP VE to the application servers.
+
+This solution uses (requires) a [BIG-IQ device](https://f5.com/products/big-iq-centralized-management) with a pool of BIG-IP VE licenses to automatically license the auto scaled BIG-IP VEs.
+
+The **autoscale_ltm** heat orchestration template incorporates existing networks defined in Neutron.
 
 ## Prerequisites and Configuration Notes
-  - The HA (Highly Available) solution consists of two templates that configure clustering:
-    - *f5_bigip_cluster_2_nic.yaml*, the parent template that needs to be specified as the template parameter.
-    - *f5_bigip_cluster_instance_2_nic.yaml*, the BIG-IP instance-specific template referenced by the parent template.
-  - Management Interface IP is determined via DHCP.
-  - The cluster self IP on the BIG-IP VE must reside on the same subnet as the VLAN configured for the data/public NIC.
-  - You must provide an additional network interface static IP address. If you want to use DHCP, the template can be modified to remove the **fixed_ips** property for the port.
+  - You must have an existing BIG-IQ device with a pool of BIG-IP LTM licenses to use this solution.
+  - The autoscale ltm solution consists of two templates that configure clustering:
+    - *f5_bigip_autoscale_ltm_2_nic.yaml*, the parent template that needs to be specified as the template parameter.
+    - *f5_bigip_autoscale_ltm_instance_2_nic.yaml*, the BIG-IP instance-specific template referenced by the parent template.
+  - There are no fixed IP addresses for the interfaces. The addresses will be determined upon Neutron port creation.
   - If you do not specify a URL override (the parameter name is **f5_cloudlibs_url_override**), the default location is GitHub and the subnet for the management network requires a route and access to the Internet for the initial configuration to download the BIG-IP cloud library.
   - If you specify a value for **f5_cloudlibs_url_override** or **f5_cloudlibs_tag**, ensure that corresponding hashes are valid by either updating scripts/verifyHash or by providing a **f5_cloudlibs_verify_hash_url_override** value.
-  - **Important**: This [article](https://support.f5.com/csp/article/K13092#userpassword) contains links to information regarding BIG-IP user and password management. Please take note of the following when supplying password values:
+  - **Important**: This [article](https://support.f5.com/csp/article/K13092#userpassword) contains links to information regarding BIG-IP user and password management. Take note of the following when supplying password values:
       - The BIG-IP version and any default policies that may apply
       - Any characters recommended that you avoid
-  - This template leverages the built in heat resource type *OS::Heat::WaitCondition* to track status of onboarding by sending signals to the orchestration API.
   - This template can send non-identifiable statistical information to F5 Networks to help us improve our templates. See [Sending statistical information to F5](#sending-statistical-information-to-f5).
   - In order to pass traffic from your clients to the servers, after launching the template, you must create virtual server(s) on the BIG-IP VE.
+  - This template includes a master election feature, which ensures that if the existing master BIG-IP VE is unavailable, a new master is selected from the BIG-IP VEs in the cluster.
+  - This template leverages the following built-in heat resource types:
+      - *OS::Heat::WaitCondition* to track status of onboarding by sending signals to the orchestration API.
+      - *OS::Ceilometer::Alarm* and *OS::Heat::AutoScalingGroup* to trigger the autoscaling of resources.
+      - *OS::Heat::SwiftSignal* to create an endpoint for autoscaling metadata used in master election.
+  - **Important**: You may need to perform additional configuration for the OpenStack services Ceilometer (metering) and Swift (container) in your environment in order to utilize this template. This template also requires a user account with sufficient privileges to perform Ceilometer, Swift and Heat operations.
 
 ## Security
 This Heat Orchestration Template downloads helper code to configure the BIG-IP system. If you want to verify the integrity of the template, you can open and modify the definition of the **verifyHash** file in **/scripts/verifyHash**.
@@ -44,16 +52,17 @@ For more information, please refer to:
  - BIG-IP Virtual Edition Image Version 13.0 or later
  - OpenStack Mitaka Deployment
 
-### Help
+### Getting Help
 While this template has been created by F5 Networks, it is in the experimental directory and therefore has not completed full testing and is subject to change.  F5 Networks does not offer technical support for templates in the experimental directory. For supported templates, see the templates in the **supported** directory.
 
-We encourage you to use our [Slack channel](https://f5cloudsolutions.herokuapp.com) for discussion and assistance on F5 Cloud templates.  This channel is typically monitored Monday-Friday 9-5 PST by F5 employees who will offer best-effort support.
+**Community Support**  
+We encourage you to use our [Slack channel](https://f5cloudsolutions.herokuapp.com) for discussion and assistance on F5 OpenStack Heat Orchestration templates. There are F5 employees who are members of this community who typically monitor the channel Monday-Friday 9-5 PST and will offer best-effort assistance. This slack channel community support should **not** be considered a substitute for F5 Technical Support. See the [Slack Channel Statement](https://github.com/F5Networks/f5-openstack-hot/blob/master/slack-channel-statement.md) for guidelines on using this channel.
 
 ## Launching Stacks
 
 1. Ensure the prerequisites are configured in your environment. See the README from this project's root folder.
 2. Clone this repository or manually download the contents (zip/tar). As the templates use nested stacks and referenced components, we recommend you retain the project structure as is for ease of deployment. If any of the files changed location, make sure that the corresponding paths are updated in the environment files.
-3. Locate and update the environment file (_env.yaml) with the appropriate parameter values. Note that some default values are used if no value is specified for an optional parameter.
+3. Locate and update the environment file (`_env.yaml`) with the appropriate parameter values. Note that some default values are used if no value is specified for an optional parameter.
 4. Launch the stack using the OpenStack CLI with a command using the following syntax::
 
 #### CLI Syntax
@@ -61,7 +70,7 @@ We encourage you to use our [Slack channel](https://f5cloudsolutions.herokuapp.c
 
 #### CLI Example
 ```
-openstack stack create stack-2NIC-cluster -t src/f5-openstack-hot/experimental/templates/cluster/2nic/f5_bigip_cluster_2_nic.yaml -e src/f5-openstack-hot/experimental/templates/cluster/2nic/f5_bigip_cluster_2_nic_env.yaml
+openstack stack create stack-autoscale-ltm -t src/f5-openstack-hot/experimental/templates/solutions/autoscale/ltm/f5_bigip_autoscale_ltm_instance_2_nic.yaml -e src/f5-openstack-hot/experimental/templates/solutions/autoscale/ltm/f5_bigip_autoscale_ltm_instance_2_nic.yaml
 ```
 
 ### Parameters
@@ -96,8 +105,11 @@ The following parameters can be defined in your environment file.
 
 | Parameter | Required | Description | Constraints |
 | --- | :---: | --- | --- |
-| bigip_license_keys | Yes | List of Primary BIG-IP VE License Base Keys | Syntax: List of Base License Keys |
-| bigip_addon_license_keys | No | Additional BIG-IP VE License Keys | Syntax: List of AddOn License Keys. One list item per BIG-IP instance. Each list item consists of add-on keys separated by a semicolon `addonKey1;addonKey2` |
+| bigiq_license_host_ip | Yes | The IP address (or FQDN) for the existing BIG-IQ instance to be used when licensing the BIG-IP. | Must be reachable from the BIG-IP instance |
+| bigiq_license_username | Yes | The BIG-IQ username to use to license the BIG-IP instances. |  |
+| bigiq_license_pwd | Yes | The BIG-IQ password to use to license the BIG-IP instances. |  |
+| bigiq_license_pool | Yes | The BIG-IQ License Pool to use to license the BIG-IP instances. |  |
+| bigiq_use_bigip_floating_ip | Yes | Determines whether to use the floating ip of the BIG-IP for BIG-IQ licensing |  |
 | bigip_modules | No | Modules to provision on the BIG-IP VE.  The default is `ltm:nominal` | Syntax: List of `module:level`. See [Parameter Values](#parameter-values) |
 
 #### OS Network
@@ -121,7 +133,6 @@ The following parameters can be defined in your environment file.
 | bigip_vlan_mtu | No | MTU value of the VLAN on the BIG-IP. The default is **1400**. |  |
 | bigip_vlan_tag | No | Tag to apply on the VLAN on the BIG-IP. Use the default value **None** for untagged. |  |
 | bigip_vlan_nic | No | The NIC associated with the BIG-IP VLAN. For 2-NIC this defaults to **1.1** |  |
-| bigip_self_ip_addresses | Yes | List of self IP addresses to associate with the BIG-IP VLAN.  | A static value must be supplied. |
 | bigip_self_cidr_block | Yes | CIDR Block for the BIG-IP self IP address. |  |
 | bigip_self_port_lockdown | No | Optional list of service:port lockdown settings for the VLAN. If no value is supplied, the default is used.  |  Syntax: List of `service:port` example: `[tcp:443, tcp:22]` |
 
@@ -133,7 +144,31 @@ The following parameters can be defined in your environment file.
 | bigip_device_group | No | Name of the BIG-IP Device Group to create or join. The default is **Sync**  |  |
 | bigip_auto_sync | No | Toggles flag for enabling BIG-IP Cluster Auto Sync. The default is **true**.  |  |
 | bigip_save_on_auto_sync | No | Toggles flag for enabling saving on config-sync auto-sync . The default is **true**.  |  |
-| bigip_cluster_self_ip_addresses | Yes | List of BIG-IP self IP addresses to use for clustering |  |
+
+#### OS Autoscale
+
+| Parameter | Required | Description | Constraints |
+| --- | :---: | --- | --- |
+| autoscale_group_tag | Yes | String value to attach as metadata to instance to help identify membership in the autoscaling group  | Must be unique for the tenant.  |
+| autoscale_meter_name | No | The meter on which to base the autoscale event. | The default is **network.incoming.bytes.rate** . **NOTE: Ceilometer must be configured accordingly.**  |
+| autoscale_meter_stat | No | The meter statistic to evaluate. | Allowed values are [count, **avg**, sum, min] |
+| autoscale_adjustment_type | No | Type of adjustment for the scaling policy. | Allowed values are [ **change_in_capacity**, exact_capacity, percent_change_in_capacity] |
+| autoscale_policy_cooldown | No | The cooldown period for the scale up/down policy, in seconds |  |
+| autoscale_group_cooldown | No | The cooldown period for the autoscale group, in seconds |  |
+| autoscale_scale_up_threshold | No | The meter threshold value to evaluate against and trigger a scale UP |  |
+| autoscale_scale_down_threshold | No | The meter threshold value to evaluate against and trigger a scale DOWN |  |
+| autoscale_scale_up_operator | No | Operator used to compare specified statistic with threshold and trigger a scale UP. | Allowed values are [ge, **gt**, eq, ne, lt, le] |
+| autoscale_scale_down_operator | No | Operator used to compare specified statistic with threshold and trigger a scale DOWN. | Allowed values are [ge, gt, eq, ne, **lt**, le] |
+| autoscale_period | No | The period (seconds) to evaluate over. This is used to determine the amount of time needed for a threshold to be reached. |  |
+| autoscale_num_eval_period | No | The number of periods to evaluate over. This is used to determine the amount of time needed for a threshold to be reached. |  |
+| autoscale_set_min_count | No | The minimum number of BIG-IP VE instance to deploy in the scaling group. |  |
+| autoscale_set_max_count | No | The maximum number of BIG-IP VE instances to deploy in the scaling group. |  |
+| os_username | Yes | User name for OpenStack account that can perform heat, ceilometer, and swift operations |  |
+| os_password | Yes | Password for OpenStack account that can perform heat, ceilometer, and swift operations |  |
+| os_region | Yes | Region for OpenStack account that can perform  heat, ceilometer, and swift operations |  |
+| os_auth_url | Yes | Auth Endpoint URL for OpenStack account that can perform  heat, ceilometer, and swift operations |  |
+| os_auth_version | No | Version of the Auth URL | The default is **v3** |  |
+| os_domain_name | No | Name of the OpenStack account domain | The default is **default** |  |
 
 <br>
 
@@ -141,7 +176,7 @@ The following parameters can be defined in your environment file.
 bigip_modules:
  - modules: [afm,am,apm,asm,avr,dos,fps,gtm,ilx,lc,ltm,pem,swg,urldb]
  - levels: [custom,dedicated,minimum,nominal,none]
- 
+
 ### Sending statistical information to F5
 All of the F5 templates now have an option to send anonymous statistical data to F5 Networks to help us improve future templates.  
 None of the information we collect is personally identifiable, and only includes:
@@ -152,7 +187,7 @@ None of the information we collect is personally identifiable, and only includes
 - F5 template version
 - Cloud Name
 - Region: this is a hash of the region (if supplied as parameter)
-- BIG-IP version 
+- BIG-IP version
 - F5 license type
 - F5 Cloud libs version
 - F5 script name
@@ -163,6 +198,9 @@ This information is critical to the future improvements of templates, but should
 If you find an issue, we would love to hear about it.
 You have a choice when it comes to filing issues:
   - Use the **Issues** link on the GitHub menu bar in this repository for items such as enhancement or feature requests and non-urgent bug fixes. Tell us as much as you can about what you found and how you found it.
+  - Contact us at [solutionsfeedback@f5.com](mailto:solutionsfeedback@f5.com?subject=GitHub%20Feedback) for general feedback or enhancement requests. 
+  - Use our [Slack channel](https://f5cloudsolutions.herokuapp.com) for discussion and assistance on F5 cloud templates. There are F5 employees who are members of this community who typically monitor the channel Monday-Friday 9-5 PST and will offer best-effort assistance.
+  - For templates in the **supported** directory, contact F5 Technical support via your typical method for more time sensitive changes and other issues requiring immediate support.
 
 
 ## Copyright
