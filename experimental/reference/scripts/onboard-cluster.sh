@@ -1,15 +1,17 @@
 #!/bin/bash
 echo '******Starting Cluster Configuration******'
 
+source /config/cloud/openstack/onboard_env
+
 msg=""
 stat="FAILURE"
-deviceName="__host_name__"
+deviceName=$bigip_hostname
 
-masterIp="__master_mgmt_ip__"
-mgmtIp="__mgmt_ip__"
-configSyncIp="__config_sync_ip__"
-autoSync="__auto_sync__"
-saveOnAutoSync="__save_on_auto_sync__"
+masterIp=$bigip_master_mgmt_ip_address
+mgmtIp=$bigip_mgmt_ip_address
+configSyncIp=$bigip_config_sync_ip
+autoSync=$bigip_auto_sync
+saveOnAutoSync=$bigip_save_on_auto_sync
 
 if [[ "$autoSync" == "True" ]]; then
     autoSync="--auto-sync"
@@ -54,13 +56,13 @@ echo 'Config-Sync Master device'
     f5-rest-node /config/cloud/openstack/node_modules/f5-cloud-libs/scripts/cluster.js \
     -o /var/log/onboard-cluster.log \
     --log-level debug \
-    --host __mgmt_ip__\
+    --host $bigip_mgmt_ip_address \
     --user admin \
     --password-url file:///config/cloud/openstack/adminPwd \
-    --port __mgmt_port__ \
+    --port $bigip_management_port \
     --create-group \
-    --device-group __device_group__ \
-    --sync-type __sync_type__ \
+    --device-group $bigip_device_group \
+    --sync-type $bigip_sync_type \
     --device "$deviceName" \
     --network-failover \
     "$autoSync" \
@@ -70,14 +72,14 @@ echo 'Config-Sync Secondary device'
     f5-rest-node /config/cloud/openstack/node_modules/f5-cloud-libs/scripts/cluster.js \
     -o /var/log/onboard-cluster.log \
     --log-level debug \
-    --host __mgmt_ip__\
+    --host $bigip_mgmt_ip_address \
     --user admin \
     --password-url file:///config/cloud/openstack/adminPwd \
-    --port __mgmt_port__ \
+    --port $bigip_management_port \
     --join-group \
-    --device-group __device_group__ \
+    --device-group $bigip_device_group \
     --sync \
-    --remote-host __master_mgmt_ip__ \
+    --remote-host $bigip_master_mgmt_ip_address \
     --remote-user admin \
     --remote-password-url file:///config/cloud/openstack/adminPwd
 
@@ -95,4 +97,9 @@ fi
 
 msg="$msg *** Instance: $deviceName"
 echo "$msg"
-wc_notify --data-binary '{"status": "'"$stat"'", "reason":"'"$msg"'"}' --retry 5 --retry-max-time 300 --retry-delay 30
+data="{\"status\": \"${stat}\", \"reason\": \"${msg}\"}"
+cmd="$os_wait_condition_onboard_cluster_complete --data-binary '$data' --retry 5 --retry-max-time 300 --retry-delay 30"
+eval "$cmd"
+
+
+

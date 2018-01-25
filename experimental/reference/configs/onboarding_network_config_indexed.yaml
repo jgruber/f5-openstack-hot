@@ -47,7 +47,7 @@ parameters:
     type: comma_delimited_list
     label: f5 BIG-IP VE VLAN SelfIP Address
     description: Self-IP address to associate with the BIG-IP VLAN.
-  self_cidr_blocks:
+  self_cidrs:
     type: comma_delimited_list
     label: f5 BIG-IP VE VLAN CIDR Block
     description: CIDR Block for the BIG-IP SelfIP address.
@@ -86,7 +86,7 @@ resources:
                   __network_vlan_last_nic_index__: { get_param: vlan_last_nic_index }
                   __network_self_name__: ""
                   __network_self_ip_addr__: { get_param: [self_ip_addrs, {get_param: vlan_nic_index} ] }
-                  __network_self_cidr_block__: { get_param: [self_cidr_blocks, {get_param: vlan_nic_index} ] }
+                  __network_self_cidr_block__: { get_param: [self_cidrs, {get_param: vlan_nic_index} ] }
                   __network_self_port_lockdown__:
                     list_join:
                       - ' '

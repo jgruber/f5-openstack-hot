@@ -1,26 +1,47 @@
 #!/bin/bash
 echo '*****ONBOARD STARTING******'
 
+source /config/cloud/openstack/onboard_env
+
 #vars
 #some default values set by heat str_replace
 
 #licensing
-licenseKey="__license__"
+licenseKey=$bigip_license_key
 licenseOpt="--license"
-addOnLicenses="__add_on_licenses__"
-bigIqHost="__bigiq_host__"
-bigIqUsername="__bigiq_username__"
-bigIqLicPool="__bigiq_lic_pool__"
-bigIqUseAltMgmtIp="__bigiq_use_alt_mgmt_ip__"
-bigIqAltMgmtIp="__bigiq_alt_mgmt_ip__"
-bigIqAltMgmtPort="__bigiq_alt_mgmt_port__"
+addOnLicenses=$bigip_addon_license_keys
+bigIqHost=$bigiq_license_host_ip
+bigIqUsername=$bigiq_license_username
+bigIqLicPool=$bigiq_license_pool
+bigIqUseAltMgmtIp=$bigiq_use_alt_bigip_mgmt_ip
+bigIqAltMgmtIp=$bigiq_alt_bigip_mgmt_ip
+bigIqAltMgmtPort=$bigiq_alt_bigip_mgmt_port
 bigIqPwdUri="file:///config/cloud/openstack/bigIqPwd"
 bigIqMgmtIp=""
 bigIqMgmtPort=""
 
-dns="__dns__"
-hostName="__host_name__"
-mgmtPortId="__mgmt_port_id__"
+dns_list=($(echo $bigip_servers_dns | sed -e 's/[][]//g' -e 's/"//g' -e 's/,//g'))
+dns=""
+for i in ${dns_list[@]}; do dns="${dns}--dns $i "; done
+dns=$(echo $dns|sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+
+ntp_list=($(echo $bigip_servers_ntp | sed -e 's/[][]//g' -e 's/"//g' -e 's/,//g'))
+ntp=""
+for i in ${ntp_list[@]}; do ntp="${ntp}--ntp $i "; done
+ntp=$(echo $ntp|sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+
+modules_list=($(echo $bigip_modules | sed -e 's/[][]//g' -e 's/"//g' -e 's/,//g'))
+modules=""
+for i in ${modules_list[@]}; do ="${modules}--module $i "; done
+modules=$(echo $modules|sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+
+addons_list=($(echo $bigip_addon_license_keys | sed -e 's/[][]//g' -e 's/"//g' -e 's/,//g'))
+addOnLicenses=""
+for i in ${addons_list[@]}; do ="${addOnLicenses}--add-on $i "; done
+addOnLicenses=$(echo $addOnLicenses|sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+
+hostName=$bigip_hostname
+mgmtPortId=$os_management_port_id
 adminPwd=""
 newRootPwd=""
 oldRootPwd=""
@@ -28,16 +49,16 @@ msg=""
 stat="FAILURE"
 logFile="/var/log/onboard.log"
 
-allowUsageAnalytics="__allow_ua__"
-templateName="__template_name__"
-templateVersion="__template_version__"
-cloudLibsTag="__cloudlibs_tag__"
-custId=$(echo "__cust_id__"|sha512sum|cut -d " " -f 1)
-deployId=$(echo "__deploy_id__"|sha512sum|cut -d " " -f 1)
-region="__region__"
+allowUsageAnalytics=$f5_ua_allow
+templateName=$f5_ua_template_name
+templateVersion=$f5_ua_template_version
+cloudLibsTag=$f5_ua_cloudlibs_tag
+custId=$(echo "f5_ua_project_id"|sha512sum|cut -d " " -f 1)
+deployId=$(echo "f5_ua_stack_id"|sha512sum|cut -d " " -f 1)
+region=$f5_ua_region
 metrics=""
 metricsOpt=""
-licenseType="__license_type__"
+licenseType=$f5_ua_license_type
 
 function set_vars() {
     if [ "$addOnLicenses" == "--add-on None" ]; then
@@ -46,6 +67,14 @@ function set_vars() {
 
     if [ "$dns" == "--dns None" ]; then
         dns=""
+    fi
+
+    if [ "$ntp" == "--ntp None" ]; then
+        ntp=""
+    fi
+
+    if [ "$modules" == "--module None" ]; then
+        modules=""
     fi
 
     if [ "$licenseType" == "BIGIQ" ]; then
@@ -113,10 +142,10 @@ function onboard_run() {
         --hostname "$hostName" \
         $licenseOpt $license \
         --log-level debug \
-        __modules__ \
-        __ntp__ \
+        $modules\
+        $ntp \
         --output "$logFile" \
-        --port __mgmt_port__ \
+        --port $bigip_management_port \
         --set-root-password old:"$oldRootPwd",new:"$newRootPwd" \
         --tz UTC \
         --user admin --password-url file:///config/cloud/openstack/adminPwd ; then
@@ -144,7 +173,9 @@ function onboard_run() {
 
 function send_heat_signal() {
     echo "$msg"
-    wc_notify --data-binary '{"status": "'"$stat"'", "reason":"'"$msg"'"}' --retry 5 --retry-max-time 300 --retry-delay 30
+    data="{\"status\": \"${stat}\", \"reason\": \"${msg}\"}"
+    cmd="$os_wait_condition_onboard_complete --data-binary '$data' --retry 5 --retry-max-time 300 --retry-delay 30"
+    eval "$cmd"
 }
 
 function main() {

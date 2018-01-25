@@ -1,10 +1,15 @@
 #!/bin/bash
 echo '******STARTING PRE-ONBOARD******'
 
-verifyHashOverride="__verify_hash_override__"
+source /config/cloud/openstack/onboard_env
 
-if [[ "$verifyHashOverride" != "" && "$verifyHashOverride" != "None" ]]; then
-    curl ${verifyHashOverride} > /config/verifyHash
+
+echo $bigiq_license_pwd > /config/cloud/openstack/bigIqPwd
+chown root:root /config/cloud/openstack/bigIqPwd
+chmod 0644 /config/cloud/openstack/bigIqPwd
+
+if [[ "$f5_verify_hash_url_override" != "" && "$f5_verify_hash_url_override" != "None" ]]; then
+    curl ${f5_verify_hash_url_override} > /config/verifyHash
 fi
 
 msg=""
@@ -23,22 +28,22 @@ while [ $checks -lt 120 ]; do echo checking mcpd
     sleep 10
 done
 
-#echo 'loading verifyHash script'
-#if ! tmsh load sys config merge file /config/verifyHash; then
-#    echo cannot validate signature of /config/verifyHash
-#    msg="Unable to validate verifyHash."
-#fi
-#echo 'loaded verifyHash'
-#declare -a filesToVerify=("/config/cloud/openstack/f5-cloud-libs.tar.gz" "/config/cloud/openstack/f5-cloud-libs-openstack.tar.gz")
-#for fileToVerify in "${filesToVerify[@]}"
-#do
-#    echo verifying "$fileToVerify"
-#    if ! tmsh run cli script verifyHash "$fileToVerify"; then
-#        echo "$fileToVerify" is not valid
-#        msg="Unable to verify one or more files."
-#    fi
-#    echo verified "$fileToVerify"
-#done
+echo 'loading verifyHash script'
+if ! tmsh load sys config merge file /config/verifyHash; then
+    echo cannot validate signature of /config/verifyHash
+    msg="Unable to validate verifyHash."
+fi
+echo 'loaded verifyHash'
+declare -a filesToVerify=("/config/cloud/openstack/f5-cloud-libs.tar.gz" "/config/cloud/openstack/f5-cloud-libs-openstack.tar.gz")
+for fileToVerify in "${filesToVerify[@]}"
+do
+    echo verifying "$fileToVerify"
+    if ! tmsh run cli script verifyHash "$fileToVerify"; then
+        echo "$fileToVerify" is not valid
+        msg="Unable to verify one or more files."
+    fi
+    echo verified "$fileToVerify"
+done
 
 #*************************************************************************************************
 if [[ "$msg" == "" ]]; then
@@ -51,16 +56,15 @@ fi
 
 #*************************************************************************************************
 echo 'Configuring access to cloud-init data'
-useConfigDrive="__use_config_drive__"
 configDriveSrc=$(blkid -t LABEL="config-2" -odevice)
 configDriveDest="/mnt/config"
 
-if [[ "$useConfigDrive" == "True" ]]; then
+if [[ "$os_use_config_drive" == "True" ]]; then
     echo 'Configuring Cloud-init ConfigDrive'
     mkdir -p $configDriveDest
     if mount "$configDriveSrc" $configDriveDest; then
         echo 'Adding SSH Key from Config Drive'
-        if sshKey=$(python -c 'import sys, json; print json.load(sys.stdin)["public_keys"]["__ssh_key_name__"]' <"$configDriveDest"/openstack/latest/meta_data.json) ; then
+        if sshKey=$(python -c "import sys, json; print json.load(sys.stdin)['public_keys']['$os_ssh_key_name']" <"$configDriveDest"/openstack/latest/meta_data.json) ; then
             echo "$sshKey" >> /root/.ssh/authorized_keys
         else
             msg="Pre-onboard failed: Unable to inject SSH key from config drive."
@@ -96,6 +100,10 @@ else
     msg="Last Error:$msg . See /var/log/preOnboard.log for details."
 fi
 
-wc_notify --data-binary '{"status": "'"$stat"'", "reason":"'"$msg"'"}' --retry 5 --retry-max-time 300 --retry-delay 30
+data="{\"status\": \"${stat}\", \"reason\": \"${msg}\"}"
+cmd="$os_wait_condition_onboard_complete --data-binary '$data' --retry 5 --retry-max-time 300 --retry-delay 30"
+eval "$cmd"
+
+
 echo "$msg"
 echo '******PRE-ONBOARD DONE******'

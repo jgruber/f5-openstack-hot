@@ -1,11 +1,8 @@
 #!/bin/bash
 
-nic="__nic__"
-mtu="__mtu__"
-addr="__addr__"
-cidr_bits=$(echo "__cidr__" | cut -d/ -f2)
-gateway="__gateway__"
-dns="__dns__"
+source /config/cloud/openstack/onboard_env
+
+cidr_bits=$(echo $bigip_mgmt_cidr | cut -d/ -f2)
 msg=""
 stat="SUCCESS"
 logFile="/var/log/setup-static-mgmt.log"
@@ -25,12 +22,12 @@ function check_mcpd_up() {
 }
 
 function restart_nic() {
-    ifdown "$nic" && ifup "$nic"
-    ip link set "$nic" mtu "$mtu"
+    ifdown "$bigip_mgmt_interface_name" && ifup "$bigip_mgmt_interface_name"
+    ip link set "$bigip_mgmt_interface_name" mtu "$bigip_mgmt_mtu"
 }
 
 function persiste_mtu() {
-    echo "ip link set $nic mtu $mtu" >> /config/startup
+    echo "ip link set $bigip_mgmt_interface_name mtu $bigip_mgmt_mtu" >> /config/startup
 }
 
 function disable_mgmt_dhcp() {
@@ -45,16 +42,16 @@ function disable_mgmt_dhcp() {
 
 function create_mgmt_ip() {
     echo 'Creating mgmt - ip... '
-    if ! tmsh create /sys management-ip "$addr/$cidr_bits" ; then
+    if ! tmsh create /sys management-ip "$bigip_mgmt_ip_address/$cidr_bits" ; then
         msg="$msg.. Unable to set mgmt-ip."
         stat="FAILURE"
     fi
 }
 
 function create_mgmt_gateway() {
-    if [[ "$gateway" != "" && "$gateway" != "None" ]]; then
+    if [[ "$bigip_mgmt_gateway" != "" && "$bigip_mgmt_gateway" != "None" ]]; then
         echo 'Creating mgmt - gateway route...'
-        if ! tmsh create sys management-route default gateway $gateway ; then
+        if ! tmsh create sys management-route default gateway $bigip_mgmt_gateway ; then
             msg="$msg.. Unable to create a default gateway route."
             stat="FAILURE"
         fi
@@ -62,9 +59,9 @@ function create_mgmt_gateway() {
 }
 
 function add_dns_servers() {
-    if [[ "$dns" != "" && "$dns" != "None" ]]; then
+    if [[ "$bigip_mgmt_dns_nameservers" != "" && "$bigip_mgmt_dns_nameservers" != "None" ]]; then
         echo 'Creating dns server entries...'
-        nameservers=$(echo $dns | sed 's/[][]//g' | tr ',' ' ')
+        nameservers=$(echo $bigip_mgmt_dns_nameservers | sed 's/[][]//g' | tr ',' ' ')
         # need to set this early in case we need to resolve hosts (e.g. we are downloading libs from github)
         tmsh modify sys dns name-servers add { $nameservers }
     fi
@@ -79,7 +76,9 @@ function manage_signal() {
         msg="Setup-staticMgmt command exited without error."
     fi
 
-    wc_notify --data-binary '{"status": "'"$stat"'", "reason":"'"$msg"'"}' --retry 5 --retry-max-time 300 --retry-delay 30
+    data="{\"status\": \"${stat}\", \"reason\": \"${msg}\"}"
+    cmd="$os_wait_condition_static_mgmt --data-binary '$data' --retry 5 --retry-max-time 300 --retry-delay 30"
+    eval "$cmd"
 }
 
 function main () {

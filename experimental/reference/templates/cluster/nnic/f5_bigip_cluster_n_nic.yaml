@@ -338,6 +338,11 @@ resources:
       timeout: 1800
   wait_handle_onboard_cluster_slave:
     type: OS::Heat::WaitConditionHandle
+  mgmt_security_group:
+    type: F5::BigIP::ManagementSecurityGroup
+    properties:
+      security_group_name: {get_param: mgmt_security_group_name}
+      management_port: {get_param: bigip_mgmt_port}
   mgmt_port_master:
     type: OS::Neutron::Port
     properties:
@@ -346,11 +351,6 @@ resources:
         - ip_address: 0.0.0.0/0
         - ip_address: ::/0
       security_groups: [{get_attr: [mgmt_security_group, mgmt_security_group_id]}]
-  mgmt_security_group:
-    type: F5::BigIP::ManagementSecurityGroup
-    properties:
-      security_group_name: {get_param: mgmt_security_group_name}
-      management_port: {get_param: bigip_mgmt_port}
   floating_ip_master:
     type: OS::Neutron::FloatingIP
     properties:
@@ -368,17 +368,71 @@ resources:
       bigip_vlan_mtus: {get_param: bigip_vlan_mtus}
       bigip_self_port_lockdowns: {get_param: bigip_self_port_lockdowns}
       bigip_default_gateway: {get_param: bigip_default_gateway}
-      wait_handle_curl: {get_attr: [wait_handle_onboard_network_master, curl_cli]}
-  init_0_static_mgmt_config_master:
-    type: F5::BigIP::StaticMgmtConfig
+  environment_variables_master:
+    type: F5::BigIP::EnvironmentVariables
     properties:
-      interface_name: mgmt
-      mtu: {get_param: mgmt_mtu}
-      ip_address: { get_attr: [mgmt_port_master, fixed_ips, 0, ip_address] }
-      cidr: { get_attr: [mgmt_port_master, subnets, 0, cidr] }
-      gateway: { get_attr: [mgmt_port_master, subnets, 0, gateway_ip] }
-      dns_nameservers: { get_attr: [mgmt_port_master, subnets, 0, dns_nameservers] }
-      wait_handle_curl: { get_attr: [wait_handle_static_mgmt_config_master, curl_cli] }
+      os_wait_condition_static_mgmt: {get_attr: [wait_handle_static_mgmt_config_master, curl_cli]}
+      os_wait_condition_onboard_network: {get_attr: [wait_handle_onboard_network_master, curl_cli]}
+      os_wait_condition_onboard_complete: {get_attr: [wait_handle_onboard_master, curl_cli]}
+      os_wait_condition_onboard_cluster_complete: {get_attr: [wait_handle_onboard_cluster_master, curl_cli]}
+      os_management_port_id: { get_resource: mgmt_port_master }
+      os_ssh_key_name: { get_param: bigip_os_ssh_key }
+      os_use_config_drive: { get_param: use_config_drive }
+      bigip_mgmt_interface_name: mgmt
+      bigip_mgmt_mtu: {get_param: mgmt_mtu}
+      bigip_mgmt_ip_address: { get_attr: [mgmt_port_master, fixed_ips, 0, ip_address] }
+      bigip_mgmt_cidr: { get_attr: [mgmt_port_master, subnets, 0, cidr] }
+      bigip_mgmt_gateway: { get_attr: [mgmt_port_master, subnets, 0, gateway_ip] }
+      bigip_mgmt_dns_nameservers: { get_attr: [mgmt_port_master, subnets, 0, dns_nameservers] }
+      bigip_host_name: { get_attr: [mgmt_port_master, show, dns_assignment, 0, fqdn] }
+      bigip_management_port: { get_param: bigip_mgmt_port }
+      bigip_nic_count: {get_param: bigip_nic_count}
+      bigip_default_gateway: {get_param: bigip_default_gateway}
+      bigip_servers_ntp: { get_param: bigip_servers_ntp }
+      bigip_servers_dns: { get_param: bigip_servers_dns }
+      bigip_vlan_creates: 
+        repeat:
+          template: "True"
+          for_each:
+            vlan: { get_param: bigip_vlan_names }
+      bigip_vlan_names: {get_param: bigip_vlan_names}
+      bigip_vlan_mtus: {get_param: bigip_vlan_mtus}
+      bigip_vlan_tags: {get_param: bigip_vlan_tags}
+      bigip_self_ip_addrs: {get_attr: [bigip_nnic_handler_master, bigip_selfips]}
+      bigip_self_cidrs: {get_attr: [bigip_nnic_handler_master, bigip_selfip_cidrs]}
+      bigip_self_port_lockdowns: {get_param: bigip_self_port_lockdowns}
+      bigip_license_key: { get_param: bigip_license_key_master }
+      bigip_addon_license_keys: { get_param: bigip_addon_license_keys_master }
+      bigip_modules: { get_param: bigip_modules }      
+      bigiq_use_alt_bigip_mgmt_ip: False
+      bigiq_alt_bigip_mgmt_ip: None
+      bigiq_alt_bigip_mgmt_port: 0
+      bigiq_license_host_ip: None
+      bigiq_license_username: None
+      bigiq_license_pwd: None
+      bigiq_license_pool: None
+      bigip_master_mgmt_ip_address: { get_attr: [mgmt_port_master, fixed_ips, 0, ip_address] }
+      bigip_device_group: {get_param: bigip_cluster_name}
+      bigip_sync_type: {get_param: bigip_cluster_sync_type}
+      bigip_auto_sync: {get_param: bigip_cluster_auto_sync}
+      bigip_save_on_auto_sync: {get_param: bigip_cluster_save_on_auto_sync}
+      bigip_config_sync_ip: {get_attr: [bigip_nnic_handler_master, bigip_selfips, 0]}    
+      f5_cloudlibs_tag: { get_param: f5_cloudlibs_tag }
+      f5_cloudlibs_url_override: { get_param: f5_cloudlibs_url_override }
+      f5_cloudlibs_os_tag: { get_param: f5_cloudlibs_openstack_tag }
+      f5_cloudlibs_os_url_override: { get_param: f5_cloudlibs_openstack_url_override }
+      f5_ua_allow: { get_param: allow_usage_analytics }
+      f5_ua_template_name: exp-f5_bigip_standalone_n_nic.yaml
+      f5_ua_template_version: 3.0.0
+      f5_ua_cloudlibs_tag: { get_param: f5_cloudlibs_tag }
+      f5_ua_project_id: { get_param: 'OS::project_id'}
+      f5_ua_region: None
+      f5_ua_stack_id: { get_param: 'OS::stack_id' }
+      f5_ua_license_type: None
+      f5_verify_hash_url_override: { get_param: f5_cloudlibs_verify_hash_url_override }
+      f5_keep_admin: False
+      f5_keep_bigiq: False
+      f5_keep_config_drive: False
   mgmt_port_slave:
     type: OS::Neutron::Port
     properties:
@@ -404,74 +458,98 @@ resources:
       bigip_vlan_mtus: {get_param: bigip_vlan_mtus}
       bigip_self_port_lockdowns: {get_param: bigip_self_port_lockdowns}
       bigip_default_gateway: {get_param: bigip_default_gateway}
-      wait_handle_curl: {get_attr: [wait_handle_onboard_network_slave, curl_cli]}
-  init_0_static_mgmt_config_slave:
-    type: F5::BigIP::StaticMgmtConfig
+  environment_variables_slave:
+    type: F5::BigIP::EnvironmentVariables
     properties:
-      interface_name: mgmt
-      mtu: {get_param: mgmt_mtu}
-      ip_address: { get_attr: [mgmt_port_slave, fixed_ips, 0, ip_address] }
-      cidr: { get_attr: [mgmt_port_slave, subnets, 0, cidr] }
-      gateway: { get_attr: [mgmt_port_slave, subnets, 0, gateway_ip] }
-      dns_nameservers: { get_attr: [mgmt_port_slave, subnets, 0, dns_nameservers] }
-      wait_handle_curl: { get_attr: [wait_handle_static_mgmt_config_slave, curl_cli] }
+      os_wait_condition_static_mgmt: {get_attr: [wait_handle_static_mgmt_config_slave, curl_cli]}
+      os_wait_condition_onboard_network: {get_attr: [wait_handle_onboard_network_slave, curl_cli]}
+      os_wait_condition_onboard_complete: {get_attr: [wait_handle_onboard_slave, curl_cli]}
+      os_wait_condition_onboard_cluster_complete: {get_attr: [wait_handle_onboard_cluster_slave, curl_cli]}
+      os_management_port_id: { get_resource: mgmt_port_slave }
+      os_ssh_key_name: { get_param: bigip_os_ssh_key }
+      os_use_config_drive: { get_param: use_config_drive }
+      bigip_mgmt_interface_name: mgmt
+      bigip_mgmt_mtu: {get_param: mgmt_mtu}
+      bigip_mgmt_ip_address: { get_attr: [mgmt_port_slave, fixed_ips, 0, ip_address] }
+      bigip_mgmt_cidr: { get_attr: [mgmt_port_slave, subnets, 0, cidr] }
+      bigip_mgmt_gateway: { get_attr: [mgmt_port_slave, subnets, 0, gateway_ip] }
+      bigip_mgmt_dns_nameservers: { get_attr: [mgmt_port_slave, subnets, 0, dns_nameservers] }
+      bigip_host_name: { get_attr: [mgmt_port_slave, show, dns_assignment, 0, fqdn] }
+      bigip_management_port: { get_param: bigip_mgmt_port }
+      bigip_nic_count: {get_param: bigip_nic_count}
+      bigip_default_gateway: {get_param: bigip_default_gateway}
+      bigip_servers_ntp: { get_param: bigip_servers_ntp }
+      bigip_servers_dns: { get_param: bigip_servers_dns }
+      bigip_vlan_creates: 
+        repeat:
+          template: "True"
+          for_each:
+            vlan: { get_param: bigip_vlan_names }
+      bigip_vlan_names: {get_param: bigip_vlan_names}
+      bigip_vlan_mtus: {get_param: bigip_vlan_mtus}
+      bigip_vlan_tags: {get_param: bigip_vlan_tags}
+      bigip_self_ip_addrs: {get_attr: [bigip_nnic_handler_slave, bigip_selfips]}
+      bigip_self_cidrs: {get_attr: [bigip_nnic_handler_slave, bigip_selfip_cidrs]}
+      bigip_self_port_lockdowns: {get_param: bigip_self_port_lockdowns}
+      bigip_license_key: { get_param: bigip_license_key_slave }
+      bigip_addon_license_keys: { get_param: bigip_addon_license_keys_slave }
+      bigip_modules: { get_param: bigip_modules }      
+      bigiq_use_alt_bigip_mgmt_ip: False
+      bigiq_alt_bigip_mgmt_ip: None
+      bigiq_alt_bigip_mgmt_port: 0
+      bigiq_license_host_ip: None
+      bigiq_license_username: None
+      bigiq_license_pwd: None
+      bigiq_license_pool: None
+      bigip_master_mgmt_ip_address: { get_attr: [mgmt_port_master, fixed_ips, 0, ip_address] }
+      bigip_device_group: {get_param: bigip_cluster_name}
+      bigip_sync_type: {get_param: bigip_cluster_sync_type}
+      bigip_auto_sync: {get_param: bigip_cluster_auto_sync}
+      bigip_save_on_auto_sync: {get_param: bigip_cluster_save_on_auto_sync}
+      bigip_config_sync_ip: {get_attr: [bigip_nnic_handler_slave, bigip_selfips, 0]}    
+      f5_cloudlibs_tag: { get_param: f5_cloudlibs_tag }
+      f5_cloudlibs_url_override: { get_param: f5_cloudlibs_url_override }
+      f5_cloudlibs_os_tag: { get_param: f5_cloudlibs_openstack_tag }
+      f5_cloudlibs_os_url_override: { get_param: f5_cloudlibs_openstack_url_override }
+      f5_ua_allow: { get_param: allow_usage_analytics }
+      f5_ua_template_name: exp-f5_bigip_standalone_n_nic.yaml
+      f5_ua_template_version: 3.0.0
+      f5_ua_cloudlibs_tag: { get_param: f5_cloudlibs_tag }
+      f5_ua_project_id: { get_param: 'OS::project_id'}
+      f5_ua_region: None
+      f5_ua_stack_id: { get_param: 'OS::stack_id' }
+      f5_ua_license_type: None
+      f5_verify_hash_url_override: { get_param: f5_cloudlibs_verify_hash_url_override }
+      f5_keep_admin: False
+      f5_keep_bigiq: False
+      f5_keep_config_drive: False
+  init_0_static_mgmt_config:
+    type: F5::BigIP::StaticMgmtConfig
   init_1_override_default_config:
     type: F5::BigIP::OverrideDefaultConfig
     properties:
       admin_password: {get_param: bigip_admin_pwd}
       root_password: {get_param: bigip_root_pwd}
   init_2_onboard_libs:
+    type: F5::BigIP::OnboardingLibs
+  init_3_onboard_scripts:
+    type: F5::BigIP::OnboardingScripts
+  init_4_onboard_network_config:
+    type: F5::BigIP::OnboardNetworkConfigNNic
+  init_5_onboard_cluster_config:
+    type: F5::BigIP::OnboardClusterConfig
+  init_6_run_cluster_core_commands_static_mgmt:
     type: OS::Heat::CloudConfig
     properties:
       cloud_config:
         merge_how: dict(recurse_array,no_replace)+list(append)
-        write_files:
-          - path: /config/download-cloudlibs.sh
-            permissions: 0755
-            owner: root:root
-            content: { get_attr: [onboard_libs, config] }
-  onboard_libs:
-    type: F5::BigIP::OnboardingLibs
-    properties:
-      cloudlibs_tag: { get_param: f5_cloudlibs_tag }
-      cloudlibs_url_override: { get_param: f5_cloudlibs_url_override }
-      cloudlibs_os_tag: { get_param: f5_cloudlibs_openstack_tag }
-      cloudlibs_os_url_override: { get_param: f5_cloudlibs_openstack_url_override }
-  init_3_onboard_scripts_master:
-    type: F5::BigIP::OnboardingScripts
-    properties:
-      verify_hash_url_override: { get_param: f5_cloudlibs_verify_hash_url_override}
-      bigip_addon_licenses: { get_param: bigip_addon_license_keys_master }
-      bigip_license: { get_param: bigip_license_key_master }
-      modules: { get_param: bigip_modules }
-      ntp: { get_param: bigip_servers_ntp }
-      dns: { get_param: bigip_servers_dns }
-      host_name: { get_attr: [mgmt_port_master, show, dns_assignment, 0, fqdn] }
-      management_port_id: { get_resource: mgmt_port_master }
-      management_port: { get_param: bigip_mgmt_port }
-      ssh_key_name: { get_param: bigip_os_ssh_key }
-      use_config_drive: { get_param: use_config_drive }
-      wait_handle_curl: { get_attr: [wait_handle_onboard_master, curl_cli] }
-      ua_allow: { get_param: allow_usage_analytics }
-      ua_cloudlibs_tag: { get_param: f5_cloudlibs_tag }
-      ua_project_id: { get_param: 'OS::project_id'}
-      ua_stack_id: { get_param: 'OS::stack_id' }
-      ua_template_name: exp-f5_bigip_active_standby_n_nic.yaml
-      ua_template_version: 3.0.0
-  init_6_onboard_cluster_config_master:
-    type: F5::BigIP::OnboardClusterConfig
-    properties:
-      master_mgmt_ip: {get_attr: [mgmt_port_master, fixed_ips, 0, ip_address]}
-      mgmt_ip: {get_attr: [mgmt_port_master, fixed_ips, 0, ip_address]}
-      mgmt_port: {get_param: bigip_mgmt_port}
-      device_group: {get_param: bigip_cluster_name}
-      sync_type: {get_param: bigip_cluster_sync_type}
-      auto_sync: {get_param: bigip_cluster_auto_sync}
-      save_on_auto_sync: {get_param: bigip_cluster_save_on_auto_sync}
-      host_name: {get_attr: [mgmt_port_master, show, dns_assignment, 0, fqdn]}
-      config_sync_ip: {get_attr: [bigip_nnic_handler_master, bigip_selfips, 0]}
-      use_config_drive: {get_param: use_config_drive}
-      wait_handle_curl: {get_attr: [wait_handle_onboard_cluster_master, curl_cli]}
+        runcmd:
+          - nohup sh -c '/config/wait-staticMgmtConfig.sh; /config/download-cloudlibs.sh' &>> /var/log/download-cloudlibs.log< /dev/null &
+          - nohup sh -c '/config/wait-cloudlibsDownload.sh; /config/preOnboard.sh' &>> /var/log/preOnboard.log < /dev/null &
+          - nohup sh -c '/config/wait-cloudlibsInstall.sh; /config/onboard.sh' >> /var/log/onboard.log < /dev/null &
+          - nohup sh -c '/config/wait-cloudlibsInstall.sh; f5-rest-node /config/cloud/openstack/node_modules/f5-cloud-libs/scripts/runScript.js --file /config/onboard-network.sh --wait-for ONBOARD_DONE --signal ONBOARD_NETWORK_DONE  -o /var/log/onboard-network.log' &>> /var/log/runScript.log < /dev/null &
+          - nohup sh -c '/config/wait-cloudlibsInstall.sh; f5-rest-node /config/cloud/openstack/node_modules/f5-cloud-libs/scripts/runScript.js --file /config/onboard-cluster.sh --wait-for ONBOARD_NETWORK_DONE --signal ONBOARD_CLUSTER_DONE' &>> /var/log/runScript.log < /dev/null &
+          - nohup sh -c '/config/wait-cloudlibsInstall.sh; f5-rest-node /config/cloud/openstack/node_modules/f5-cloud-libs/scripts/runScript.js --file /config/postOnboard.sh --wait-for ONBOARD_CLUSTER_DONE -o /var/log/postOnboard.log' &>> /var/log/runScript.log < /dev/null &  
   bigip_provision_master:
     type: OS::Heat::MultipartMime
     properties:
@@ -486,14 +564,36 @@ resources:
                 -
                   list_join:
                     - ','
-                    - [{get_resource: init_0_static_mgmt_config_master}]
+                    - [{get_resource: environment_variables_master}]
+                    - [{get_resource: init_0_static_mgmt_config}]
                     - [{get_resource: init_1_override_default_config}]
                     - [{get_resource: init_2_onboard_libs}]
-                    - [{get_resource: init_3_onboard_scripts_master}]
-                    - [{get_attr: [bigip_nnic_handler_master, init_4_onboard_network_config]}]
-                    - [{get_attr: [bigip_nnic_handler_master, init_5_run_cluster_core_commands_static_mgmt]}]
-                    - [{get_resource: init_6_onboard_cluster_config_master}]  
-                    
+                    - [{get_resource: init_3_onboard_scripts}]
+                    - [{get_resource: init_4_onboard_network_config}]
+                    - [{get_resource: init_5_onboard_cluster_config}] 
+                    - [{get_resource: init_6_run_cluster_core_commands_static_mgmt}]              
+  bigip_provision_slave:
+    type: OS::Heat::MultipartMime
+    properties:
+      parts:
+        repeat:
+          template:
+            config: <%config%>
+          for_each:
+            <%config%>:
+              str_split:
+                - ','
+                -
+                  list_join:
+                    - ','
+                    - [{get_resource: environment_variables_slave}]
+                    - [{get_resource: init_0_static_mgmt_config}]
+                    - [{get_resource: init_1_override_default_config}]
+                    - [{get_resource: init_2_onboard_libs}]
+                    - [{get_resource: init_3_onboard_scripts}]
+                    - [{get_resource: init_4_onboard_network_config}]
+                    - [{get_resource: init_5_onboard_cluster_config}]
+                    - [{get_resource: init_6_run_cluster_core_commands_static_mgmt}]
   bigip_instance_master:
     type: OS::Nova::Server
     depends_on: bigip_nnic_handler_master
@@ -518,63 +618,6 @@ resources:
                     - {get_attr: [bigip_nnic_handler_master, port_ids]}
       user_data_format: RAW
       user_data: {get_resource: bigip_provision_master}
-  init_3_onboard_scripts_slave:
-    type: F5::BigIP::OnboardingScripts
-    properties:
-      verify_hash_url_override: { get_param: f5_cloudlibs_verify_hash_url_override}
-      bigip_addon_licenses: { get_param: bigip_addon_license_keys_slave }
-      bigip_license: { get_param: bigip_license_key_slave }
-      modules: { get_param: bigip_modules }
-      ntp: { get_param: bigip_servers_ntp }
-      dns: { get_param: bigip_servers_dns }
-      host_name: { get_attr: [mgmt_port_slave, show, dns_assignment, 0, fqdn] }
-      management_port_id: { get_resource: mgmt_port_slave }
-      management_port: { get_param: bigip_mgmt_port }
-      ssh_key_name: { get_param: bigip_os_ssh_key }
-      use_config_drive: { get_param: use_config_drive }
-      wait_handle_curl: { get_attr: [wait_handle_onboard_slave, curl_cli] }
-      ua_allow: { get_param: allow_usage_analytics }
-      ua_cloudlibs_tag: { get_param: f5_cloudlibs_tag }
-      ua_project_id: { get_param: 'OS::project_id'}
-      ua_stack_id: { get_param: 'OS::stack_id' }
-      ua_template_name: exp-f5_bigip_active_standby_n_nic.yaml
-      ua_template_version: 3.0.0
-  init_6_onboard_cluster_config_slave:
-    type: F5::BigIP::OnboardClusterConfig
-    properties:
-      master_mgmt_ip: {get_attr: [mgmt_port_master, fixed_ips, 0, ip_address]}
-      mgmt_ip: {get_attr: [mgmt_port_slave, fixed_ips, 0, ip_address]}
-      mgmt_port: {get_param: bigip_mgmt_port}
-      device_group: {get_param: bigip_cluster_name}
-      sync_type: {get_param: bigip_cluster_sync_type}
-      auto_sync: {get_param: bigip_cluster_auto_sync}
-      save_on_auto_sync: {get_param: bigip_cluster_save_on_auto_sync}
-      host_name: {get_attr: [mgmt_port_slave, show, dns_assignment, 0, fqdn]}
-      config_sync_ip: {get_attr: [bigip_nnic_handler_slave, bigip_selfips, 0]}
-      use_config_drive: {get_param: use_config_drive}
-      wait_handle_curl: {get_attr: [wait_handle_onboard_cluster_slave, curl_cli]}
-  bigip_provision_slave:
-    type: OS::Heat::MultipartMime
-    properties:
-      parts:
-        repeat:
-          template:
-            config: <%config%>
-          for_each:
-            <%config%>:
-              str_split:
-                - ','
-                -
-                  list_join:
-                    - ','
-                    - [{get_resource: init_0_static_mgmt_config_slave}]
-                    - [{get_resource: init_1_override_default_config}]
-                    - [{get_resource: init_2_onboard_libs}]
-                    - [{get_resource: init_3_onboard_scripts_slave}]
-                    - [{get_attr: [bigip_nnic_handler_slave, init_4_onboard_network_config]}]
-                    - [{get_attr: [bigip_nnic_handler_slave, init_5_run_cluster_core_commands_static_mgmt]}]
-                    - [{get_resource: init_6_onboard_cluster_config_slave}]
-
   bigip_instance_slave:
     type: OS::Nova::Server
     depends_on: bigip_nnic_handler_slave
@@ -655,7 +698,3 @@ outputs:
   data_fixed_subnets_slave:
     description: The port ids of the TMM interfaces
     value: {get_attr: [bigip_nnic_handler_slave, port_subnets]}
-
-
-
-  

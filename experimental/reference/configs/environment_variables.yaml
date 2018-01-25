@@ -1,0 +1,426 @@
+heat_template_version: 2016-04-08
+
+description: This template creates environment variables required to provision a Big-IP.
+
+parameters:
+  # OpenStack Environment
+  os_wait_condition_static_mgmt:
+    type: string
+    label: CURL prefix for Static Managment Signaling
+    description: Wait condition for static management port provisioning complete signaling
+    default: None
+  os_wait_condition_onboard_network:
+    type: string
+    label: CURL prefix for Network Onboard Signaling
+    description: Wait condition for network provisioning complete signaling
+    default: None
+  os_wait_condition_onboard_complete:
+    type: string
+    label: CURL prefix for Onboard Complete signaling
+    description: Wait condition for onboard provisioning complete signaling
+    default: None
+  os_wait_condition_onboard_cluster_complete:
+    type: string
+    label: CURL prefix for Cluster Complete signaling
+    description: Wait condition for onboard provisioning complete signaling
+    default: None
+  os_management_port_id:
+    type: string
+    label: Management Port ID
+    description: Neutron Port ID of the BIG-IP Management NIC
+  os_ssh_key_name:
+    type: string
+    label: SSH Key Name
+    description: SSH Key Name to inject for Big-IP Access.
+  os_use_config_drive:
+    type: boolean
+    label: Enable Config Drive
+    description: Determines if cloud init data is polled from config drive instead of metadata service.
+    default: false
+  # Management Interface Environment
+  bigip_mgmt_interface_name:
+    type: string
+    label: Management Interface Name
+    description: Name of the management interface to be configured
+    default: mgmt
+  bigip_mgmt_mtu:
+    type: number
+    label: Interface MTU
+    description: MTU to use for the management interface
+    default: 1400
+  bigip_mgmt_ip_address:
+    type: string
+    label: IP Address
+    description: IP Address to assign to the interface
+  bigip_mgmt_cidr:
+    type: string
+    label: CIDR
+    description: Network CIDR for the interface
+  bigip_mgmt_gateway:
+    type: string
+    label: Gateway
+    description: Gateway to associate with the interface
+    default: None
+  bigip_mgmt_dns_nameservers:
+    type: comma_delimited_list
+    label: DNS Servers
+    description: DNS Servers to add
+    default:
+      -
+  bigip_host_name:
+    type: string
+    label: Host Name
+    description: BIG-IP Host Name
+  bigip_management_port:
+    type: number
+    label: Management Port
+    description: Management port for the BIG-IP admin
+  # Networking Onboard Environment
+  bigip_nic_count:
+    type: number
+    label: f5 BIG-IP NIC count
+    description: The number of additional NICs for the BIG-IP excluding management NIC.
+    default: 1
+  bigip_default_gateway:
+    type: string
+    label: Default Gateway IP
+    description: Upstream Gateway IP Address for VE instances.
+    default: None
+  bigip_servers_ntp:
+    type: comma_delimited_list
+    label: NTP servers
+    description: A list of NTP servers
+  bigip_servers_dns:
+    type: comma_delimited_list
+    label: Domain Name Servers
+    description: A list of Domain Name Servers
+  bigip_vlan_creates:
+    type: comma_delimited_list
+    label: f5 BIG-IP VE VLAN Create Flag
+    description: Boolean Flag to determine if a VLAN shoudl be created/referenced on the BIG-IP.
+  bigip_vlan_names:
+    type: comma_delimited_list
+    label: f5 BIG-IP VE VLAN name
+    description: Name of the VLAN to be created/referenced on the BIG-IP.
+  bigip_vlan_mtus:
+    type: comma_delimited_list
+    label: f5 BIG-IP VE VLAN MTU
+    description: MTU value of the VLAN on the BIG-IP.
+  bigip_vlan_tags:
+    type: comma_delimited_list
+    label: f5 BIG-IP VE VLAN tags
+    description: Tag to apply on the VLAN on the BIG-IP. VLAN default is untagged.
+    default: None
+  bigip_self_ip_addrs:
+    type: comma_delimited_list
+    label: f5 BIG-IP VE VLAN SelfIP Address
+    description: Self-IP address to associate with the BIG-IP VLAN.
+  bigip_self_cidrs:
+    type: comma_delimited_list
+    label: f5 BIG-IP VE VLAN CIDR Block
+    description: CIDR Block for the BIG-IP SelfIP address.
+  bigip_self_port_lockdowns:
+    type: comma_delimited_list
+    label: f5 BIG-IP VE VLAN Allow Services
+    description: Optional list of <service:port> lockdown settings for the VLAN. If no value is supplied, default port lockdown settings are used.
+    default:
+      -
+  # F5 TMOS Environemnts
+  bigip_license_key:
+    type: string
+    label: Primary VE License Base Key
+    description: f5 TMOS License Basekey
+    default: None
+  bigip_addon_license_keys:
+    type: comma_delimited_list
+    label: Additional VE License Keys
+    description: f5 TMOS License Add-On Keys.
+    default:
+      -
+  bigip_modules:
+    type: json
+    label: Modules to provision on the BIG-IP.
+    description: A list of modules to provision and their respective levels. <module_name:level>
+  bigiq_use_alt_bigip_mgmt_ip:
+    type: boolean
+    label: Use BIG-IP Alternate Management IP Address for licensing
+    description: Determines whether to provide an alternate management ip address for licensing with BIG-IQ
+    default: false
+  # F5 BIG-IQ Orchestration Environment
+  bigiq_alt_bigip_mgmt_ip:
+    type: string
+    label: f5 BIG-IP Alternate License Management IP address
+    description: An alternate management IP address of the BIG-IP instance to use to receive responses for BIG-IQ licensing.
+    default: None
+  bigiq_alt_bigip_mgmt_port:
+    type: string
+    label: f5 BIG-IP Alternate License Management Port
+    description: An alternate management port of the BIG-IP instance to use to receive responses for BIG-IQ licensing.
+    default: None
+  bigiq_license_host_ip:
+    type: string
+    label: f5 BIG-IQ License Host IP Address
+    description: The IP address (or FQDN) for the existing BIG-IQ instance to be used when licensing the BIG-IP. The instance can exist in another cloud environment as long as it is network reachable.
+    default: None
+  bigiq_license_username:
+    type: string
+    label: f5 BIG-IQ UserName
+    description: The BIG-IQ username to use to license the BIG-IP instances.
+    default: None
+  bigiq_license_pwd:
+    type: string
+    label: f5 BIG-IQ Password
+    description: The BIG-IQ password to use to license the BIG-IP instances.
+    default: None
+  bigiq_license_pool:
+    type: string
+    label: f5 BIG-IQ License Pool Name
+    description: f5 BIG-IP License Pool to use to license the BIG-IP instances.
+    default: None
+  bigip_master_mgmt_ip_address:
+    type: string
+    label: f5 BIG-IP Master Management IP
+    description: Management IP Address of the master BIG-IP.
+    default: None
+  bigip_device_group:
+    type: string
+    label: f5 BIG-IP Device Group Name
+    description: Name of the BIG-IP Group to create or join.
+    default: Sync
+  bigip_sync_type:
+    type: string
+    label: f5 BIG-IP Cluster Sync Type
+    description: Sync type for clustering.
+    default: sync-failover
+  bigip_auto_sync:
+    type: boolean
+    label: f5 BIG-IP Cluster Auto Sync
+    description: Enable config-sync auto-sync.
+    default: True
+  bigip_save_on_auto_sync:
+    type: boolean
+    label: f5 BIG-IP Cluster Save On Auto Sync
+    description: Enable config-sync auto-sync.
+    default: True
+  bigip_config_sync_ip:
+    type: string
+    label: f5 BIG-IP Cluster Self-IP
+    description: ConfigSync IP Address of this BIG-IP.
+    default: None
+  # F5 Orchestration Environment
+  f5_cloudlibs_tag:
+    type: string
+    label: f5-cloud-libs Tag
+    description: Tag that determines version of cloudlibs to use. If specified, ensure that hashes are updated for verifyHash
+    default: v3.5.0
+  f5_cloudlibs_url_override:
+    type: string
+    label: f5-cloud-libs URL Override
+    description: Alternate URL for f5-cloud-libs package. If not specified, the default GitHub location for f5-cloud-libs will be used. If version is different from default f5_cloudlibs_tag, ensure that hashes are valid by updating scripts/verifyHash.
+    default: None
+  f5_cloudlibs_os_tag:
+    type: string
+    label: f5-cloud-libs-openstack tag
+    description: Tag that determines version of f5-cloudlibs-openstack to use. If specified, ensure that hashes are updated for verifyHash.
+    default: v1.0.0
+  f5_cloudlibs_os_url_override:
+    type: string
+    label: f5-cloud-libs-openstack URL Override
+    description: Alternate URL for f5-cloud-libs-openstack package. If not specified, the default GitHub location for f5-cloud-libs will be used. If version is different from default f5_cloudlibs_os_tag, ensure that hashes are valid by updating scripts/verifyHash .
+    default: None
+  # Optional Usage Analytics
+  f5_ua_allow:
+    type: boolean
+    label: Allow Usage Analytics
+    description: Toggles whether non-identifiable statistical information is sent to F5.
+    default: true
+  f5_ua_template_name:
+    type: string
+    label: Template Name (Usage Analytics)
+    description: Name of the template used to launch the stack
+    default: None
+  f5_ua_template_version:
+    type: string
+    label: Template Version (Usage Analytics)
+    description: Version of the template used to launch the stack
+    default: None
+  f5_ua_cloudlibs_tag:
+    type: string
+    label: f5-cloud-libs Tag (Usage Analytics)
+    description: Tag that identifies cloudlibs version
+    default: None
+  f5_ua_project_id:
+    type: string
+    label: Project ID (Usage Analytics)
+    description: ID of the template user
+    default: None
+  f5_ua_region:
+    type: string
+    label: Region (Usage Analytics)
+    description: Region where template is launched
+    default: None
+  f5_ua_stack_id:
+    type: string
+    label: Stack Id (Usage Analytics)
+    description: Stack Id or Name
+    default: None
+  f5_ua_license_type:
+    type: string
+    label: License Type (Usage Analytics)
+    description: Type of Licensing
+    default: BYOL
+  f5_verify_hash_url_override:
+    type: string
+    label: Script verifyHash override source URL
+    description: The URL to the source of verifyHash script override
+    default: None
+  f5_keep_admin:
+    type: boolean
+    label: Keep Admin
+    description: Toggles removal of admin file after all onboard is done. Set to true if there is an ongoing process that needs access.
+    default: false
+  f5_keep_bigiq:
+    type: boolean
+    label: Keep Big-IQ
+    description: Toggles removal of big-iq file after all onboard is done. Set to true if there is an ongoing process that needs access.
+    default: false
+  f5_keep_config_drive:
+    type: boolean
+    label: Keep Config Drive
+    description: Toggles removal of config drive after initial onboard is done. Set to true if there is a process that needs access after initial onboard.
+    default: false
+resources:
+  environment_variables:
+    type: OS::Heat::CloudConfig
+    properties:
+      cloud_config:
+        merge_how: dict(recurse_array,no_replace)+list(append)
+        write_files:
+          - path: /config/cloud/openstack/onboard_env
+            permissions: 0644
+            owner: root:root
+            content: 
+              str_replace:
+                params:
+                  __os_wait_condition_static_mgmt__: { get_param: os_wait_condition_static_mgmt }
+                  __os_wait_condition_onboard_network__: { get_param: os_wait_condition_onboard_network }
+                  __os_wait_condition_onboard_complete__: { get_param: os_wait_condition_onboard_complete }
+                  __os_wait_condition_onboard_cluster_complete__: { get_param: os_wait_condition_onboard_cluster_complete }
+                  __os_management_port_id__: { get_param: os_management_port_id }
+                  __os_ssh_key_name__: { get_param: os_ssh_key_name }
+                  __os_use_config_drive__: { get_param: os_use_config_drive }
+                  __bigip_mgmt_interface_name__: { get_param: bigip_mgmt_interface_name }
+                  __bigip_mgmt_mtu__: { get_param: bigip_mgmt_mtu }
+                  __bigip_mgmt_ip_address__: { get_param: bigip_mgmt_ip_address }
+                  __bigip_mgmt_cidr__: { get_param: bigip_mgmt_cidr }
+                  __bigip_mgmt_gateway__: { get_param: bigip_mgmt_gateway }
+                  __bigip_mgmt_dns_nameservers__: { get_param: bigip_mgmt_dns_nameservers }
+                  __bigip_hostname__: { get_param: bigip_host_name }                  
+                  __bigip_management_port__: { get_param: bigip_management_port }      
+                  __bigip_nic_count__: { get_param: bigip_nic_count }
+                  __bigip_default_gateway__: { get_param: bigip_default_gateway }
+                  __bigip_servers_ntp__: { get_param: bigip_servers_ntp }
+                  __bigip_servers_dns__: { get_param: bigip_servers_dns }
+                  __bigip_vlan_creates__: { get_param: bigip_vlan_creates }
+                  __bigip_vlan_names__: { get_param: bigip_vlan_names }
+                  __bigip_vlan_mtus__: { get_param: bigip_vlan_mtus }
+                  __bigip_vlan_tags__: { get_param: bigip_vlan_tags }
+                  __bigip_self_ip_addrs__: { get_param: bigip_self_ip_addrs }
+                  __bigip_self_cidrs__: { get_param: bigip_self_cidrs }
+                  __bigip_self_port_lockdowns__: { get_param: bigip_self_port_lockdowns }
+                  __bigip_license_key__: { get_param: bigip_license_key }
+                  __bigip_addon_license_keys__: { get_param: bigip_addon_license_keys }
+                  __bigip_modules__: { get_param: bigip_modules }
+                  __bigiq_use_alt_bigip_mgmt_ip__: { get_param: bigiq_use_alt_bigip_mgmt_ip }
+                  __bigiq_alt_bigip_mgmt_ip__: { get_param: bigiq_alt_bigip_mgmt_ip }
+                  __bigiq_alt_bigip_mgmt_port__: { get_param: bigiq_alt_bigip_mgmt_port }
+                  __bigiq_license_host_ip__: { get_param: bigiq_license_host_ip }
+                  __bigiq_license_username__: { get_param: bigiq_license_username }
+                  __bigiq_license_pwd__: { get_param: bigiq_license_pwd }
+                  __bigiq_license_pool__: { get_param: bigiq_license_pool }
+                  __bigip_master_mgmt_ip_address__: { get_param: bigip_master_mgmt_ip_address }
+                  __bigip_device_group__: { get_param: bigip_device_group }
+                  __bigip_sync_type__: { get_param: bigip_sync_type }
+                  __bigip_auto_sync__: { get_param: bigip_auto_sync }
+                  __bigip_save_on_auto_sync__: { get_param: bigip_save_on_auto_sync }
+                  __bigip_config_sync_ip__: { get_param: bigip_config_sync_ip }   
+                  __f5_cloudlibs_tag__: { get_param: f5_cloudlibs_tag }
+                  __f5_cloudlibs_url_override__: { get_param: f5_cloudlibs_url_override }
+                  __f5_cloudlibs_os_tag__: { get_param: f5_cloudlibs_os_tag }
+                  __f5_cloudlibs_os_url_override__: { get_param: f5_cloudlibs_os_url_override }
+                  __f5_ua_allow__: { get_param: f5_ua_allow }
+                  __f5_ua_template_name__: { get_param: f5_ua_template_name }
+                  __f5_ua_template_version__: { get_param: f5_ua_template_version }
+                  __f5_ua_cloudlibs_tag__: { get_param: f5_ua_cloudlibs_tag }
+                  __f5_ua_project_id__: { get_param: f5_ua_project_id }
+                  __f5_ua_region__: { get_param: f5_ua_region }
+                  __f5_ua_stack_id__: { get_param: f5_ua_stack_id }
+                  __f5_ua_license_type__: { get_param: f5_ua_license_type }
+                  __f5_verify_hash_url_override__: { get_param: f5_verify_hash_url_override }
+                  __f5_keep_admin__: { get_param: f5_keep_admin }
+                  __f5_keep_bigiq__: { get_param: f5_keep_bigiq }
+                  __f5_keep_config_drive__: { get_param: f5_keep_config_drive }
+                template: |
+                  os_wait_condition_static_mgmt="__os_wait_condition_static_mgmt__"
+                  os_wait_condition_onboard_network="__os_wait_condition_onboard_network__"
+                  os_wait_condition_onboard_complete="__os_wait_condition_onboard_complete__"
+                  os_wait_condition_onboard_cluster_complete="__os_wait_condition_onboard_cluster_complete__"
+                  os_management_port_id='__os_management_port_id__'
+                  os_ssh_key_name='__os_ssh_key_name__'
+                  os_use_config_drive='__os_use_config_drive__'
+                  bigip_mgmt_interface_name='__bigip_mgmt_interface_name__'
+                  bigip_mgmt_mtu='__bigip_mgmt_mtu__'
+                  bigip_mgmt_ip_address='__bigip_mgmt_ip_address__'
+                  bigip_mgmt_cidr='__bigip_mgmt_cidr__'
+                  bigip_mgmt_gateway='__bigip_mgmt_gateway__'
+                  bigip_mgmt_dns_nameservers='__bigip_mgmt_dns_nameservers__'
+                  bigip_hostname='__bigip_hostname__'
+                  bigip_management_port='__bigip_management_port__'
+                  bigip_nic_count='__bigip_nic_count__'
+                  bigip_default_gateway='__bigip_default_gateway__'
+                  bigip_servers_ntp='__bigip_servers_ntp__'
+                  bigip_servers_dns='__bigip_servers_dns__'
+                  bigip_vlan_creates='__bigip_vlan_creates__'
+                  bigip_vlan_names='__bigip_vlan_names__'
+                  bigip_vlan_mtus='__bigip_vlan_mtus__'
+                  bigip_vlan_tags='__bigip_vlan_tags__'
+                  bigip_self_ip_addrs='__bigip_self_ip_addrs__'
+                  bigip_self_cidrs='__bigip_self_cidrs__'
+                  bigip_self_port_lockdowns='__bigip_self_port_lockdowns__'
+                  bigip_license_key='__bigip_license_key__'
+                  bigip_addon_license_keys='__bigip_addon_license_keys__'
+                  bigip_modules='__bigip_modules__'
+                  bigiq_use_alt_bigip_mgmt_ip='__bigiq_use_alt_bigip_mgmt_ip__'
+                  bigiq_alt_bigip_mgmt_ip='__bigiq_alt_bigip_mgmt_ip__'
+                  bigiq_alt_bigip_mgmt_port='__bigiq_alt_bigip_mgmt_port__'
+                  bigiq_license_host_ip='__bigiq_license_host_ip__'
+                  bigiq_license_username='__bigiq_license_username__'
+                  bigiq_license_pwd='__bigiq_license_pwd__'
+                  bigiq_license_pool='__bigiq_license_pool__'
+                  bigip_master_mgmt_ip_address='__bigip_master_mgmt_ip_address__'
+                  bigip_device_group='__bigip_device_group__'
+                  bigip_sync_type='__bigip_sync_type__'
+                  bigip_auto_sync='__bigip_auto_sync__'
+                  bigip_save_on_auto_sync='__bigip_save_on_auto_sync__'
+                  bigip_config_sync_ip='__bigip_config_sync_ip__'
+                  f5_cloudlibs_tag='__f5_cloudlibs_tag__'
+                  f5_cloudlibs_url_override='__f5_cloudlibs_url_override__'
+                  f5_cloudlibs_os_tag='__f5_cloudlibs_os_tag__'
+                  f5_cloudlibs_os_url_override='__f5_cloudlibs_os_url_override__'
+                  f5_ua_allow='__f5_ua_allow__'
+                  f5_ua_template_name='__f5_ua_template_name__'
+                  f5_ua_template_version='__f5_ua_template_version__'
+                  f5_ua_cloudlibs_tag='__f5_ua_cloudlibs_tag__'
+                  f5_ua_project_id='__f5_ua_project_id__'
+                  f5_ua_region='__f5_ua_region__'
+                  f5_ua_stack_id='__f5_ua_stack_id__'
+                  f5_ua_license_type='__f5_ua_license_type__'
+                  f5_verify_hash_url_override='__f5_verify_hash_url_override__'
+                  f5_keep_admin='__f5_keep_admin__'
+                  f5_keep_bigiq='__f5_keep_bigiq__'
+                  f5_keep_config_drive='__f5_keep_config_drive__'
+outputs:
+  OS::stack_id:
+    description: The F5::BigIP::EnvironmentVariables resource.
+    value:
+      get_resource: environment_variables
