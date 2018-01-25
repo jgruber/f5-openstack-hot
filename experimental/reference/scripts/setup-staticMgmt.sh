@@ -69,16 +69,19 @@ function add_dns_servers() {
 
 function manage_signal() {
     if [[ "$stat" == "FAILURE" ]]; then
-        echo "$msg"
         msg="Setup-staticMgmt command exited with error. See $logFile for details."
     else
         touch /config/cloud/openstack/staticMgmtReady
         msg="Setup-staticMgmt command exited without error."
     fi
 
-    data="{\"status\": \"${stat}\", \"reason\": \"${msg}\"}"
-    cmd="$os_wait_condition_static_mgmt --data-binary '$data' --retry 5 --retry-max-time 300 --retry-delay 30"
-    eval "$cmd"
+    echo "$msg"
+
+    if ! [[ "$os_wait_condition_static_mgmt" == "" || "$os_wait_condition_static_mgmt" == "None"  ]]; then
+        data="{\"status\": \"${stat}\", \"reason\": \"${msg}\"}"
+        cmd="$os_wait_condition_static_mgmt --data-binary '$data' --retry 5 --retry-max-time 300 --retry-delay 30"
+        eval "$cmd"
+    fi
 }
 
 function main () {

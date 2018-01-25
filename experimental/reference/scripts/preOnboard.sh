@@ -100,10 +100,11 @@ else
     msg="Last Error:$msg . See /var/log/preOnboard.log for details."
 fi
 
-data="{\"status\": \"${stat}\", \"reason\": \"${msg}\"}"
-cmd="$os_wait_condition_onboard_complete --data-binary '$data' --retry 5 --retry-max-time 300 --retry-delay 30"
-eval "$cmd"
-
+if ! [[ "$os_wait_condition_onboard_complete" == "" || "$os_wait_condition_onboard_complete" == "None"  ]]; then
+    data="{\"status\": \"${stat}\", \"reason\": \"${msg}\"}"
+    cmd="$os_wait_condition_onboard_complete --data-binary '$data' --retry 5 --retry-max-time 300 --retry-delay 30"
+    eval "$cmd"
+fi
 
 echo "$msg"
 echo '******PRE-ONBOARD DONE******'

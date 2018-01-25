@@ -97,9 +97,12 @@ fi
 
 msg="$msg *** Instance: $deviceName"
 echo "$msg"
-data="{\"status\": \"${stat}\", \"reason\": \"${msg}\"}"
-cmd="$os_wait_condition_onboard_cluster_complete --data-binary '$data' --retry 5 --retry-max-time 300 --retry-delay 30"
-eval "$cmd"
+
+if ! [[ "$os_wait_condition_onboard_cluster_complete" == "" || "$os_wait_condition_onboard_cluster_complete" == "None"  ]]; then
+    data="{\"status\": \"${stat}\", \"reason\": \"${msg}\"}"
+    cmd="$os_wait_condition_onboard_cluster_complete --data-binary '$data' --retry 5 --retry-max-time 300 --retry-delay 30"
+    eval "$cmd"
+fi
 
 
 

@@ -9,6 +9,10 @@ stat="SUCCESS"
 function cleanup() {
     shred -u -z  /config/cloud/openstack/rootPwd
 
+    if [[ "$f5_keep_onboard_env" == "False" ]]; then
+       shred -u -z /config/cloud/openstack/onboard_env
+    fi
+
     if [[ "$f5_keep_admin" == "False" ]]; then
        shred -u -z /config/cloud/openstack/adminPwd
     fi
@@ -35,9 +39,11 @@ function run_custom_config() {
 
 function send_heat_signal() {
     echo "$msg"
-    data="{\"status\": \"${stat}\", \"reason\": \"${msg}\"}"
-    cmd="$os_wait_condition_onboard_complete --data-binary '$data' --retry 5 --retry-max-time 300 --retry-delay 30"
-    eval "$cmd"
+    if ! [[ "$os_wait_condition_onboard_complete" == "" || "$os_wait_condition_onboard_complete" == "None"  ]]; then
+        data="{\"status\": \"${stat}\", \"reason\": \"${msg}\"}"
+        cmd="$os_wait_condition_onboard_complete --data-binary '$data' --retry 5 --retry-max-time 300 --retry-delay 30"
+        eval "$cmd"
+    fi
 }
 
 function main() {

@@ -2,45 +2,16 @@ heat_template_version: 2016-04-08
 
 description: This template performs overrides of defaults for a standard f5 standalone VE image.
 
-parameters:
-  admin_password:
-    type: string
-    label: f5 VE Admin User Password
-    description: Password used to perform image import services.
-    hidden: true
-  root_password:
-    type: string
-    label: f5 VE Root User Password
-    description: Password used to perform image import services.
-    hidden: true
 resources:
   override_default_config:
     type: OS::Heat::SoftwareConfig
     properties:
       group: ungrouped
       config:
-        str_replace:
-          params:
-            __admin_password__: { get_param: admin_password }
-            __root_password__: { get_param: root_password }
-          template: |
-              #!/bin/bash
-              echo '******Overriding Default Configuration******'
-              /usr/bin/setdb provision.1nicautoconfig disable
-              /usr/bin/passwd admin __admin_password__ >/dev/null 2>&1
-              /usr/bin/passwd root __root_password__ >/dev/null 2>&1
-
-              mkdir -m 0755 -p /config/cloud/openstack
-              cd /config/cloud/openstack
-              echo __admin_password__ >> /config/cloud/openstack/adminPwd
-              echo __root_password__ >> /config/cloud/openstack/rootPwd
-
-              if [ -f /config/setup-staticMgmt.sh ]; then
-                nohup sh -c '/config/setup-staticMgmt.sh' >> /var/log/setup-static-mgmt.log < /dev/null &
-              fi
-
+        { get_file: ../scripts/onboard-defaultConfig.sh }
 outputs:
   OS::stack_id:
     description: F5::BigIP::OverrideDefaultConfig resource.
     value:
       get_resource: override_default_config
+

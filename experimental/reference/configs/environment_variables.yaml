@@ -38,6 +38,16 @@ parameters:
     description: Determines if cloud init data is polled from config drive instead of metadata service.
     default: false
   # Management Interface Environment
+  bigip_admin_pwd:
+    type: string
+    label: f5 BIG-IP VE Admin User Password
+    description: Password for the BIG-IP admin user.
+    hidden: true
+  bigip_root_pwd:
+    type: string
+    label: f5 BIG-IP VE Root User Password
+    description: Password for the BIG-IP root user.
+    hidden: true
   bigip_mgmt_interface_name:
     type: string
     label: Management Interface Name
@@ -274,6 +284,11 @@ parameters:
     label: Script verifyHash override source URL
     description: The URL to the source of verifyHash script override
     default: None
+  f5_keep_onboard_env:
+    type: boolean
+    label: Keep Onboarding Environment File
+    description: Toggles removal of environment file after all onboard is done. Set to true if there is an ongoing process that needs access.
+    default: false
   f5_keep_admin:
     type: boolean
     label: Keep Admin
@@ -309,6 +324,8 @@ resources:
                   __os_management_port_id__: { get_param: os_management_port_id }
                   __os_ssh_key_name__: { get_param: os_ssh_key_name }
                   __os_use_config_drive__: { get_param: os_use_config_drive }
+                  __bigip_admin_pwd__: {get_param: bigip_admin_pwd}
+                  __bigip_root_pwd__: {get_param: bigip_root_pwd}
                   __bigip_mgmt_interface_name__: { get_param: bigip_mgmt_interface_name }
                   __bigip_mgmt_mtu__: { get_param: bigip_mgmt_mtu }
                   __bigip_mgmt_ip_address__: { get_param: bigip_mgmt_ip_address }
@@ -357,10 +374,14 @@ resources:
                   __f5_ua_stack_id__: { get_param: f5_ua_stack_id }
                   __f5_ua_license_type__: { get_param: f5_ua_license_type }
                   __f5_verify_hash_url_override__: { get_param: f5_verify_hash_url_override }
+                  __f5_keep_onboard_env__: { get_param: f5_keep_onboard_env }
                   __f5_keep_admin__: { get_param: f5_keep_admin }
                   __f5_keep_bigiq__: { get_param: f5_keep_bigiq }
                   __f5_keep_config_drive__: { get_param: f5_keep_config_drive }
                 template: |
+                  
+                  # bash shell environment variables
+                  
                   os_wait_condition_static_mgmt="__os_wait_condition_static_mgmt__"
                   os_wait_condition_onboard_network="__os_wait_condition_onboard_network__"
                   os_wait_condition_onboard_complete="__os_wait_condition_onboard_complete__"
@@ -368,6 +389,8 @@ resources:
                   os_management_port_id='__os_management_port_id__'
                   os_ssh_key_name='__os_ssh_key_name__'
                   os_use_config_drive='__os_use_config_drive__'
+                  bigip_admin_pwd='__bigip_admin_pwd__'
+                  bigip_root_pwd='__bigip_root_pwd__'
                   bigip_mgmt_interface_name='__bigip_mgmt_interface_name__'
                   bigip_mgmt_mtu='__bigip_mgmt_mtu__'
                   bigip_mgmt_ip_address='__bigip_mgmt_ip_address__'
@@ -416,9 +439,12 @@ resources:
                   f5_ua_stack_id='__f5_ua_stack_id__'
                   f5_ua_license_type='__f5_ua_license_type__'
                   f5_verify_hash_url_override='__f5_verify_hash_url_override__'
+                  f5_keep_onboard_env='__f5_keep_onboard_env__'
                   f5_keep_admin='__f5_keep_admin__'
                   f5_keep_bigiq='__f5_keep_bigiq__'
                   f5_keep_config_drive='__f5_keep_config_drive__'
+
+
 outputs:
   OS::stack_id:
     description: The F5::BigIP::EnvironmentVariables resource.

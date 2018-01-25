@@ -302,6 +302,8 @@ resources:
       os_management_port_id: { get_resource: mgmt_port }
       os_ssh_key_name: { get_param: bigip_os_ssh_key }
       os_use_config_drive: { get_param: use_config_drive }
+      bigip_admin_pwd: {get_param: bigip_admin_pwd}
+      bigip_root_pwd: {get_param: bigip_root_pwd}
       bigip_mgmt_interface_name: mgmt
       bigip_mgmt_mtu: {get_param: mgmt_mtu}
       bigip_mgmt_ip_address: { get_attr: [mgmt_port, fixed_ips, 0, ip_address] }
@@ -348,6 +350,7 @@ resources:
       f5_ua_stack_id: { get_param: 'OS::stack_id' }
       f5_ua_license_type: None
       f5_verify_hash_url_override: { get_param: f5_cloudlibs_verify_hash_url_override }
+      f5_keep_onboard_env: False
       f5_keep_admin: False
       f5_keep_bigiq: False
       f5_keep_config_drive: False
@@ -355,9 +358,6 @@ resources:
     type: F5::BigIP::StaticMgmtConfig
   init_1_override_default_config:
     type: F5::BigIP::OverrideDefaultConfig
-    properties:
-      admin_password: {get_param: bigip_admin_pwd}
-      root_password: {get_param: bigip_root_pwd}
   init_2_onboard_libs:
     type: F5::BigIP::OnboardingLibs
   init_3_onboard_scripts:
