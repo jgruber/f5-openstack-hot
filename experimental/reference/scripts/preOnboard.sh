@@ -3,11 +3,6 @@ echo '******STARTING PRE-ONBOARD******'
 
 source /config/cloud/openstack/onboard_env
 
-
-echo $bigiq_license_pwd > /config/cloud/openstack/bigIqPwd
-chown root:root /config/cloud/openstack/bigIqPwd
-chmod 0644 /config/cloud/openstack/bigIqPwd
-
 if [[ "$f5_verify_hash_url_override" != "" && "$f5_verify_hash_url_override" != "None" ]]; then
     curl ${f5_verify_hash_url_override} > /config/verifyHash
 fi
@@ -56,15 +51,16 @@ fi
 
 #*************************************************************************************************
 echo 'Configuring access to cloud-init data'
+useConfigDrive="__use_config_drive__"
 configDriveSrc=$(blkid -t LABEL="config-2" -odevice)
 configDriveDest="/mnt/config"
 
-if [[ "$os_use_config_drive" == "True" ]]; then
+if [[ "$useConfigDrive" == "True" ]]; then
     echo 'Configuring Cloud-init ConfigDrive'
     mkdir -p $configDriveDest
     if mount "$configDriveSrc" $configDriveDest; then
         echo 'Adding SSH Key from Config Drive'
-        if sshKey=$(python -c "import sys, json; print json.load(sys.stdin)['public_keys']['$os_ssh_key_name']" <"$configDriveDest"/openstack/latest/meta_data.json) ; then
+        if sshKey=$(python -c 'import sys, json; print json.load(sys.stdin)["public_keys"]["__ssh_key_name__"]' <"$configDriveDest"/openstack/latest/meta_data.json) ; then
             echo "$sshKey" >> /root/.ssh/authorized_keys
         else
             msg="Pre-onboard failed: Unable to inject SSH key from config drive."
@@ -100,11 +96,11 @@ else
     msg="Last Error:$msg . See /var/log/preOnboard.log for details."
 fi
 
+echo "$msg"
 if ! [[ "$os_wait_condition_onboard_complete" == "" || "$os_wait_condition_onboard_complete" == "None"  ]]; then
     data="{\"status\": \"${stat}\", \"reason\": \"${msg}\"}"
     cmd="$os_wait_condition_onboard_complete --data-binary '$data' --retry 5 --retry-max-time 300 --retry-delay 30"
     eval "$cmd"
 fi
 
-echo "$msg"
 echo '******PRE-ONBOARD DONE******'

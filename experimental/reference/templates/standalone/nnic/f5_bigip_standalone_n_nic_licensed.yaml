@@ -303,7 +303,7 @@ resources:
       bigip_self_port_lockdowns: {get_param: bigip_self_port_lockdowns}
 
   bigip_licensor:
-    type: F5::BigIQ::LicensePoolUnmanagedMember
+    type: F5::BigIQ::PurchasedPoolLicensor
     depends_on: [bigip_instance]
     properties:
       bigiq_host: {get_param: f5_bigiq_host}

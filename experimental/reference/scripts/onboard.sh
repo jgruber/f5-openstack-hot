@@ -178,7 +178,6 @@ function send_heat_signal() {
         cmd="$os_wait_condition_onboard_complete --data-binary '$data' --retry 5 --retry-max-time 300 --retry-delay 30"
         eval "$cmd"
     fi
-
 }
 
 function main() {

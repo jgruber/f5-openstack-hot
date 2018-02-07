@@ -323,7 +323,7 @@ resources:
       bigip_self_port_lockdowns: {get_param: bigip_self_port_lockdowns}
 
   bigip_master_licensor:
-    type: F5::BigIQ::LicensePoolUnmanagedMember
+    type: F5::BigIQ::RegKeyPoolLicensor
     depends_on: [active_standby_cluster]
     properties:
       bigiq_host: {get_param: f5_bigiq_host}
@@ -335,7 +335,7 @@ resources:
       bigip_password: {get_param: bigip_admin_pwd}
 
   bigip_slave_licensor:
-    type: F5::BigIQ::LicensePoolUnmanagedMember
+    type: F5::BigIQ::RegKeyPoolLicensor
     depends_on: [active_standby_cluster]
     properties:
       bigiq_host: {get_param: f5_bigiq_host}
