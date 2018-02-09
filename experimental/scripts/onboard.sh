@@ -20,13 +20,13 @@ bigIqMgmtPort=""
 
 dns="__dns__"
 hostName="__host_name__"
-mgmtIp="__mgmt_ip__"
+mgmtPortId="__mgmt_port_id__"
 adminPwd=""
 newRootPwd=""
 oldRootPwd=""
 msg=""
 stat="FAILURE"
-logFile="/var/log/onboard.log"
+logFile="/var/log/cloud/openstack/onboard.log"
 
 allowUsageAnalytics="__allow_ua__"
 templateName="__template_name__"
@@ -68,12 +68,16 @@ function set_vars() {
     fi
 
     if [[ "$hostName" == "" || "$hostName" == "None" ]]; then
-      echo 'building hostname manually - no fqdn returned from neutron port assignment'
-      dnsSuffix=$(/bin/grep search /etc/resolv.conf | awk '{print $2}')
-      hostName="host-$mgmtIp.$dnsSuffix"
+        echo 'using mgmt neutron portid as hostname - no fqdn returned from neutron port assignment'
+        # get first matching domain
+        dnsSuffix=$(/bin/grep search /etc/resolv.conf | awk '{print $2}')
+        if [[ "$dnsSuffix" == "" ]]; then
+            dnsSuffix="openstacklocal"
+        fi
+            hostName="host-$mgmtPortId.$dnsSuffix"
     else
-      #remove trailing . from fqdn
-      hostName=${hostName%.}
+        #remove trailing . from fqdn
+        hostName=${hostName%.}
     fi
 
     onboardRun=$(grep "Starting Onboard call" -i -c -m 1 "$logFile" )
@@ -117,13 +121,13 @@ function onboard_run() {
         --tz UTC \
         --user admin --password-url file:///config/cloud/openstack/adminPwd ; then
 
-        licenseExists=$(tail /var/log/onboard.log -n 25 | grep "Fault code: 51092" -i -c)
+        licenseExists=$(tail /var/log/cloud/openstack/onboard.log -n 25 | grep "Fault code: 51092" -i -c)
 
         if [ "$licenseExists" -gt 0 ]; then
             msg="Onboard completed but licensing failed. Error 51092: This license has already been activated on a different unit."
             stat="SUCCESS"
         else
-            errorCount=$(tail /var/log/onboard.log | grep "BIG-IP onboard failed" -i -c)
+            errorCount=$(tail /var/log/cloud/openstack/onboard.log | grep "BIG-IP onboard failed" -i -c)
 
             if [ "$errorCount" -gt 0 ]; then
                 msg="Onboard command failed. See logs for details."
@@ -131,7 +135,7 @@ function onboard_run() {
                 msg="Onboard command exited without error."
                 stat="SUCCESS"
             fi
-            
+
         fi
     else
         msg='Onboard exited with an error signal.'

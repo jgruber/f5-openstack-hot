@@ -62,7 +62,7 @@ parameters:
     type: boolean
     label: Allow Usage Analytics
     description: Toggles whether non-identifiable statistical information is sent to F5.
-    default: True
+    default: true
   #bigip credentials
   bigip_os_ssh_key:
     type: string
@@ -180,46 +180,46 @@ parameters:
 parameter_groups:
   - label: BIG-IP General Provisioning
     parameters:
-    - bigip_image
-    - bigip_flavor
-    - use_config_drive
-    - f5_cloudlibs_tag
-    - f5_cloudlibs_url_override
-    - f5_cloudlibs_verify_hash_url_override
-    - f5_cloudlibs_openstack_tag
-    - f5_cloudlibs_openstack_url_override
-    - bigip_servers_ntp
-    - bigip_servers_dns
-    - allow_usage_analytics
+      - bigip_image
+      - bigip_flavor
+      - use_config_drive
+      - f5_cloudlibs_tag
+      - f5_cloudlibs_url_override
+      - f5_cloudlibs_verify_hash_url_override
+      - f5_cloudlibs_openstack_tag
+      - f5_cloudlibs_openstack_url_override
+      - bigip_servers_ntp
+      - bigip_servers_dns
+      - allow_usage_analytics
   - label: BIG-IP Credentials
     parameters:
-    - bigip_os_ssh_key
-    - bigip_admin_pwd
-    - bigip_root_pwd
+      - bigip_os_ssh_key
+      - bigip_admin_pwd
+      - bigip_root_pwd
   - label: BIG-IP Licensing and Modules
     parameters:
-    - bigip_license_key
-    - bigip_addon_license_keys
-    - bigip_modules
+      - bigip_license_key
+      - bigip_addon_license_keys
+      - bigip_modules
   - label: OS Network
     parameters:
-    - external_network
-    - mgmt_network
-    - mgmt_security_group_name
-    - network_vlan_security_group_name
-    - network_vlan_name
-    - network_vlan_subnet
+      - external_network
+      - mgmt_network
+      - mgmt_security_group_name
+      - network_vlan_security_group_name
+      - network_vlan_name
+      - network_vlan_subnet
   - label: BIG-IP Network
     parameters:
-    - bigip_default_gateway
-    - bigip_mgmt_port
-    - bigip_vlan_name
-    - bigip_vlan_mtu
-    - bigip_vlan_tag
-    - bigip_vlan_nic
-    - bigip_self_ip_addr
-    - bigip_self_cidr_block
-    - bigip_self_port_lockdown
+      - bigip_default_gateway
+      - bigip_mgmt_port
+      - bigip_vlan_name
+      - bigip_vlan_mtu
+      - bigip_vlan_tag
+      - bigip_vlan_nic
+      - bigip_self_ip_addr
+      - bigip_self_cidr_block
+      - bigip_self_port_lockdown
 
 resources:
   wait_condition_onboard_complete:
@@ -290,7 +290,7 @@ resources:
       ntp: { get_param: bigip_servers_ntp }
       dns: { get_param: bigip_servers_dns }
       host_name: { get_attr: [mgmt_port, show, dns_assignment, 0, fqdn] }
-      management_ip: { get_attr: [mgmt_port, fixed_ips, 0, ip_address] }
+      management_port_id: { get_resource: mgmt_port }
       management_port: { get_param: bigip_mgmt_port }
       ssh_key_name: { get_param: bigip_os_ssh_key }
       use_config_drive: { get_param: use_config_drive }
@@ -300,7 +300,7 @@ resources:
       ua_project_id: { get_param: 'OS::project_id'}
       ua_stack_id: { get_param: 'OS::stack_id' }
       ua_template_name: sup-f5_bigip_standalone_2_nic.yaml
-      ua_template_version: 3.0.0
+      ua_template_version: 3.1.0
   init_4_onboard_network_config:
     type: F5::BigIP::OnboardNetworkConfig
     properties:
@@ -309,7 +309,7 @@ resources:
       vlan_mtu: { get_param: bigip_vlan_mtu }
       vlan_nic: { get_param: bigip_vlan_nic }
       self_ip_addr: { get_param: bigip_self_ip_addr }
-      self_cidr_block:  { get_param: bigip_self_cidr_block }
+      self_cidr_block: { get_param: bigip_self_cidr_block }
       self_port_lockdown: { get_param: bigip_self_port_lockdown }
       default_gateway: { get_param: bigip_default_gateway }
       wait_handle_curl: { get_attr: [wait_handle_onboard_network, curl_cli]}
@@ -319,19 +319,19 @@ resources:
       cloud_config:
         merge_how: dict(recurse_array,no_replace)+list(append)
         runcmd:
-          - nohup /config/preOnboard.sh &>> /var/log/preOnboard.log < /dev/null &
-          - nohup sh -c '/config/wait_cloudlibs_install.sh; /config/onboard.sh' >> /var/log/onboard.log < /dev/null &
-          - nohup sh -c '/config/wait_cloudlibs_install.sh; f5-rest-node /config/cloud/openstack/node_modules/f5-cloud-libs/scripts/runScript.js --file /config/postOnboard.sh --wait-for ONBOARD_NETWORK_DONE -o /var/log/postOnboard.log' &>> /var/log/runScript.log < /dev/null &
-          - nohup sh -c '/config/wait_cloudlibs_install.sh; f5-rest-node /config/cloud/openstack/node_modules/f5-cloud-libs/scripts/runScript.js --file /config/onboard-network.sh --wait-for ONBOARD_DONE --signal ONBOARD_NETWORK_DONE  -o /var/log/onboard-network.log' &>> /var/log/runScript.log < /dev/null &
+          - nohup /config/preOnboard.sh &>> /var/log/cloud/openstack/preOnboard.log < /dev/null &
+          - nohup sh -c '/config/wait_cloudlibs_install.sh; /config/onboard.sh' >> /var/log/cloud/openstack/onboard.log < /dev/null &
+          - nohup sh -c '/config/wait_cloudlibs_install.sh; f5-rest-node /config/cloud/openstack/node_modules/f5-cloud-libs/scripts/runScript.js --file /config/postOnboard.sh --wait-for ONBOARD_NETWORK_DONE -o /var/log/cloud/openstack/postOnboard.log' &>> /var/log/cloud/openstack/runScript.log < /dev/null &
+          - nohup sh -c '/config/wait_cloudlibs_install.sh; f5-rest-node /config/cloud/openstack/node_modules/f5-cloud-libs/scripts/runScript.js --file /config/onboard-network.sh --wait-for ONBOARD_DONE --signal ONBOARD_NETWORK_DONE  -o /var/log/cloud/openstack/onboard-network.log' &>> /var/log/cloud/openstack/runScript.log < /dev/null &
   bigip_provision:
     type: OS::Heat::MultipartMime
     properties:
       parts:
-      - config: {get_resource: init_1_override_default_config}
-      - config: {get_resource: init_2_onboard_libs}
-      - config: {get_resource: init_3_onboard_scripts}
-      - config: {get_resource: init_4_onboard_network_config}
-      - config: {get_resource: init_5_run_commands}
+        - config: {get_resource: init_1_override_default_config}
+        - config: {get_resource: init_2_onboard_libs}
+        - config: {get_resource: init_3_onboard_scripts}
+        - config: {get_resource: init_4_onboard_network_config}
+        - config: {get_resource: init_5_run_commands}
   bigip_instance:
     type: OS::Nova::Server
     properties:
@@ -370,6 +370,6 @@ outputs:
   network_vlan_mac:
     description: The MAC address of the BIG-IP 1.1 interface
     value: { get_attr: [network_vlan_port, mac_address] }
-  network_vlan_portid:
+  network_vlan_port_id:
     description: The port id the BIG-IP 1.1 interface
     value: { get_resource: network_vlan_port }
